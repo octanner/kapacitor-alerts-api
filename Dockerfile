@@ -1,4 +1,5 @@
-FROM golang:1.9-alpine
+FROM quay.octanner.io/base/oct-golang
+
 
 RUN apk update
 RUN apk add openssl ca-certificates git
