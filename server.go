@@ -225,6 +225,10 @@ func processInstanceMemoryRequest(c *gin.Context) {
 	task.Dbrps = dbrps
 	task.Script = ""
 	task.Status = "enabled"
+        if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack,"@"){
+          task.Slack = "#"+task.Slack
+        }
+
 	t := template.Must(template.New("memoryalerttemplate").Delims("[[", "]]").Parse(memoryalerttemplate))
 	var sb bytes.Buffer
 	swr := bufio.NewWriter(&sb)
@@ -238,7 +242,6 @@ func processInstanceMemoryRequest(c *gin.Context) {
 	}
 	swr.Flush()
 	task.Script = string(sb.Bytes())
-
 	vars = addvar("app", task.App, "string", vars)
 	vars = addvar("crit", task.Crit, "int", vars)
 	vars = addvar("warn", task.Warn, "int", vars)
