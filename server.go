@@ -164,6 +164,7 @@ func main() {
 	router.DELETE("/task/memory/:app/:id", deleteTask)
 	router.GET("/tasks/memory/:app", getTasksForApp)
 	router.GET("/tasks/memory/:app/:id", getTask)
+	router.GET("/tasks/memory", listMemoryTasks)
 	router.Run()
 
 }
@@ -225,9 +226,9 @@ func processInstanceMemoryRequest(c *gin.Context) {
 	task.Dbrps = dbrps
 	task.Script = ""
 	task.Status = "enabled"
-        if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack,"@"){
-          task.Slack = "#"+task.Slack
-        }
+	if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack, "@") {
+		task.Slack = "#" + task.Slack
+	}
 
 	t := template.Must(template.New("memoryalerttemplate").Delims("[[", "]]").Parse(memoryalerttemplate))
 	var sb bytes.Buffer
@@ -557,4 +558,54 @@ func convertToSimpleTask(id string, vars Vars) (t TaskSpec, e error) {
 	tasktoreturn.Post = vars.Post.Value
 
 	return tasktoreturn, nil
+}
+
+func listMemoryTasks(c *gin.Context) {
+	var tasks []TaskSpec
+	client := http.Client{}
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	if err != nil {
+		fmt.Println(err)
+		var er ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		var er ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	defer resp.Body.Close()
+	bodybytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		var er ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	var tasklist TaskList
+	err = json.Unmarshal(bodybytes, &tasklist)
+	if err != nil {
+		fmt.Println(err)
+		var er ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+
+	for _, element := range tasklist.Tasks {
+		simpletask, err := convertToSimpleTask(element.ID, element.Vars)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if simpletask.App != "" {
+			tasks = append(tasks, simpletask)
+		}
+	}
+	c.JSON(200, tasks)
 }
