@@ -19,20 +19,23 @@ const _5xxalerttemplate = `batch
     |query('''
 select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqdn"='[[ .Fqdn ]]'
     ''')
-        .period(5m)
-        .every(30s)
+        .period(10m)
+        .every(1m)
     |eval(lambda: sigma("count"))
         .as('sigma')
         .keep('count', 'sigma')
     |alert()
         .crit(lambda: "sigma" > [[ .Sigma ]])
-        .info(lambda: "sigma" <= [[ .Sigma ]])
-        .log('/tmp/alerts.log')
+        .warn(lambda: ("sigma" <= [[ .Sigma ]] AND "sigma" >= 0.1) )
         [[if .Slack ]]
         .slack()
         .channel('[[ .Slack ]]')
         [[end]]
-        .message('[[ .Fqdn ]]: {{ if eq .Level "CRITICAL" }}Elevated 5xxs {{ end }}{{ if eq .Level "OK" }}5xxs back to normal {{ end }}{{ if eq .Level "INFO" }}5xxs Returning to Normal {{ end }} Sigma: {{ index .Fields "sigma" | printf "%0.2f" }} Count: {{ index .Fields "count" }}')
+        .message('[[ .Fqdn ]]: {{ if eq .Level "CRITICAL" }}Excessive 5xxs {{ end }}{{ if eq .Level "OK" }}5xxs back to normal {{ end }}{{ if eq .Level "INFO" }}5xxs Returning to Normal {{ end }}{{ if eq .Level "WARNING" }}Elevated 5xxs {{ end }} Metric: {{ .Name }}  Sigma: {{ index .Fields "sigma" | printf "%0.2f" }} Count: {{ index .Fields "count" }}')
+        .details('''
+<h3>{{ .Message }}</h3>
+<a href=https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=[[ .Fqdn ]]&from=now-1h&to=now&panelId=4&fullscreen>Link To Memory Banks</a>
+''')
         [[if .Email]]
         .email('[[ .Email ]]')
         [[end]]
@@ -41,6 +44,8 @@ select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqd
         [[end]]    
  
 `
+
+//https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=obertbin-voltron.alamoapp.octanner.io&from=now-1h&to=now&panelId=4&fullscreen
 
 func Process5xxRequest(c *gin.Context) {
 	var vars map[string]structs.Var
@@ -70,12 +75,12 @@ func Process5xxRequest(c *gin.Context) {
 
 	task.Type = "batch"
 	vars = addvar("type", task.Type, "string", vars)
-        var tolerancelist  map[string]string
-        tolerancelist = make(map[string]string)
-        tolerancelist["low"]="0.5"
-        tolerancelist["medium"]="1.0"
-        tolerancelist["high"]="1.5" 
-        task.Sigma = tolerancelist[task.Tolerance]
+	var tolerancelist map[string]string
+	tolerancelist = make(map[string]string)
+	tolerancelist["low"] = "0.5"
+	tolerancelist["medium"] = "1.0"
+	tolerancelist["high"] = "1.5"
+	task.Sigma = tolerancelist[task.Tolerance]
 	dbrp.Db = "opentsdb"
 	dbrp.Rp = "autogen"
 	dbrps = append(dbrps, dbrp)
@@ -100,12 +105,11 @@ func Process5xxRequest(c *gin.Context) {
 	}
 	swr.Flush()
 	task.Script = string(sb.Bytes())
-fmt.Println(task.Script)
 	vars = addvar("id", task.ID, "string", vars)
 	vars = addvar("app", task.App, "string", vars)
 	vars = addvar("fqdn", task.Fqdn, "string", vars)
 	vars = addvar("tolerance", task.Tolerance, "string", vars)
-        vars = addvar("sigma", task.Sigma, "string", vars)
+	vars = addvar("sigma", task.Sigma, "string", vars)
 	vars = addvar("slack", task.Slack, "string", vars)
 	vars = addvar("post", task.Post, "string", vars)
 	vars = addvar("email", task.Email, "string", vars)
@@ -227,7 +231,7 @@ func Delete5xxTask(c *gin.Context) {
 		if strings.HasPrefix(element.ID, c.Param("app")) && strings.HasSuffix(element.ID, "-5xx") {
 			simpletask, err := convertToSimple5xxTask(element.ID, element.Vars)
 			if err != nil {
-                                fmt.Println("error while converting") 
+				fmt.Println("error while converting")
 				fmt.Println(err)
 			}
 			task = simpletask
@@ -330,54 +334,53 @@ func Get5xxTask(c *gin.Context) {
 
 }
 func List5xxTasks(c *gin.Context) {
-        var tasks []_5xxTaskSpec
-        client := http.Client{}
-        req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
-        if err != nil {
-                fmt.Println(err)
-                var er structs.ErrorResponse
-                er.Error = "Server Error while reading response"
-                c.JSON(500, er)
-                return
-        }
-        resp, err := client.Do(req)
-        if err != nil {
-                fmt.Println(err)
-                var er structs.ErrorResponse
-                er.Error = "Server Error while reading response"
-                c.JSON(500, er)
-                return
-        }
-        defer resp.Body.Close()
-        bodybytes, err := ioutil.ReadAll(resp.Body)
-        if err != nil {
-                fmt.Println(err)
-                var er structs.ErrorResponse
-                er.Error = "Server Error while reading response"
-                c.JSON(500, er)
-                return
-        }
-        var tasklist _5xxTaskList
-        err = json.Unmarshal(bodybytes, &tasklist)
-        if err != nil {
-                fmt.Println(err)
-                var er structs.ErrorResponse
-                er.Error = "Server Error while reading response"
-                c.JSON(500, er)
-                return
-        }
+	var tasks []_5xxTaskSpec
+	client := http.Client{}
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	if err != nil {
+		fmt.Println(err)
+		var er structs.ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		var er structs.ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	defer resp.Body.Close()
+	bodybytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		var er structs.ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	var tasklist _5xxTaskList
+	err = json.Unmarshal(bodybytes, &tasklist)
+	if err != nil {
+		fmt.Println(err)
+		var er structs.ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
 
-        for _, element := range tasklist.Tasks {
-                simpletask, err := convertToSimple5xxTask(element.ID, element.Vars)
-                if err != nil {
-                        fmt.Println(err)
-                }
-                if strings.HasSuffix(simpletask.ID, "-5xx") {
-                        tasks = append(tasks, simpletask)
-                }
-        }
-        c.JSON(200, tasks)
-
+	for _, element := range tasklist.Tasks {
+		simpletask, err := convertToSimple5xxTask(element.ID, element.Vars)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if strings.HasSuffix(simpletask.ID, "-5xx") {
+			tasks = append(tasks, simpletask)
+		}
+	}
+	c.JSON(200, tasks)
 
 }
 
@@ -391,10 +394,10 @@ func addvar(name string, value string, vtype string, flistin map[string]structs.
 			intvalue, _ := strconv.Atoi(value)
 			var1.Value = intvalue
 		}
-                if vtype == "float" {
-                        floatvalue, _ := strconv.ParseFloat(value,64)
-                        var1.Value = floatvalue
-                }
+		if vtype == "float" {
+			floatvalue, _ := strconv.ParseFloat(value, 64)
+			var1.Value = floatvalue
+		}
 
 		var1.Type = vtype
 		var1.Description = name
@@ -414,7 +417,7 @@ func convertToSimple5xxTask(id string, vars _5xxVars) (t _5xxTaskSpec, e error) 
 	tasktoreturn.Slack = vars.Slack.Value
 	tasktoreturn.Email = vars.Email.Value
 	tasktoreturn.Post = vars.Post.Value
-        tasktoreturn.Sigma = vars.Sigma.Value
+	tasktoreturn.Sigma = vars.Sigma.Value
 
 	return tasktoreturn, nil
 }
