@@ -459,12 +459,14 @@ func ListMemoryTasks(c *gin.Context) {
 	}
 
 	for _, element := range tasklist.Tasks {
-		simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
-		if err != nil {
-			fmt.Println(err)
-		}
-		if simpletask.App != "" {
-			tasks = append(tasks, simpletask)
+		if strings.Contains(element.ID, "sample.memory_total") {
+			simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if simpletask.App != "" {
+				tasks = append(tasks, simpletask)
+			}
 		}
 	}
 	c.JSON(200, tasks)
