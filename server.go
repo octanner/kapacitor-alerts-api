@@ -20,7 +20,9 @@ func main() {
 	router.PATCH("/task/5xx", _5xx.Process5xxRequest)
 	router.DELETE("/task/5xx/:app", _5xx.Delete5xxTask)
 	router.GET("/task/5xx/:app", _5xx.Get5xxTask)
+        router.GET("/task/5xx/:app/state", _5xx.Get5xxTaskState)
 	router.GET("/tasks/5xx", _5xx.List5xxTasks)
+
 
 	router.Run()
 

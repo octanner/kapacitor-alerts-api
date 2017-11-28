@@ -45,11 +45,11 @@ type _5xxVars struct {
 		Value       string `json:"value"`
 		Description string `json:"description"`
 	} `json:"tolerance"`
-        Sigma struct {
-                Type        string `json:"type"`
-                Value       string `json:"value"`
-                Description string `json:"description"`
-        } `json:"sigma"`
+	Sigma struct {
+		Type        string `json:"type"`
+		Value       string `json:"value"`
+		Description string `json:"description"`
+	} `json:"sigma"`
 }
 
 type _5xxTaskSpec struct {
@@ -61,7 +61,7 @@ type _5xxTaskSpec struct {
 	App       string                 `json:"app"`
 	Fqdn      string                 `json:"fqdn"`
 	Tolerance string                 `json:"tolerance"`
-        Sigma     string                 `json:"sigma"`
+	Sigma     string                 `json:"sigma"`
 	Slack     string                 `json:"slack"`
 	Post      string                 `json:"post"`
 	Email     string                 `json:"email"`
@@ -73,4 +73,33 @@ type _5xxTaskList struct {
 		ID   string   `json:"id"`
 		Vars _5xxVars `json:"vars"`
 	} `json:"tasks"`
+}
+
+type _5xxTaskState struct {
+	Link struct {
+		Rel  string `json:"rel"`
+		Href string `json:"href"`
+	} `json:"link"`
+	Topics []struct {
+		Link struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"link"`
+		ID         string `json:"id"`
+		Level      string `json:"level"`
+		Collected  int    `json:"collected"`
+		EventsLink struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"events-link"`
+		HandlersLink struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"handlers-link"`
+	} `json:"topics"`
+}
+
+type _5xxSimpleTaskState struct {
+	App   string `json:"app"`
+	State string `json:"state"`
 }

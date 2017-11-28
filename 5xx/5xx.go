@@ -421,3 +421,48 @@ func convertToSimple5xxTask(id string, vars _5xxVars) (t _5xxTaskSpec, e error) 
 
 	return tasktoreturn, nil
 }
+
+func Get5xxTaskState(c *gin.Context) {
+	var stateresp _5xxSimpleTaskState
+	state, err := get5xxTaskState(c.Param("app"))
+	if err != nil {
+		fmt.Println(err)
+		var er structs.ErrorResponse
+		er.Error = "Server Error while reading response"
+		c.JSON(500, er)
+		return
+	}
+	stateresp.App = c.Param("app")
+	stateresp.State = state
+	c.JSON(200, stateresp)
+	return
+}
+
+func get5xxTaskState(app string) (s string, e error) {
+
+	var state string
+
+	client := http.Client{}
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1preview/alerts/topics?pattern=*"+app+"-5xx*", nil)
+	if err != nil {
+		return state, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return state, err
+	}
+	defer resp.Body.Close()
+	var taskstate _5xxTaskState
+	bodybytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return state, err
+	}
+	err = json.Unmarshal(bodybytes, &taskstate)
+	if err != nil {
+		return state, err
+	}
+
+	state = taskstate.Topics[0].Level
+	return state, nil
+
+}
