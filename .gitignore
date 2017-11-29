@@ -1,3 +1,6 @@
 testalert*
 test.go
+test.json
+patch.json
 exports.sh
+env.env
