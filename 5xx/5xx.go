@@ -36,9 +36,8 @@ select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqd
 <h3>{{ .Message }}</h3>
 <a href="https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=[[ .Fqdn ]]&from=now-1h&to=now&panelId=4&fullscreen">Link To Memory Banks</a>
 ''')
-        [[if .Email]]
-        .email('[[ .Email ]]')
-        [[end]]
+        [[if .Email]][[ range $email := .EmailArray ]]
+        .email('[[ $email ]]')[[end]][[end]]
         [[if .Post]]
         .post('[[ .Post ]]')
         [[end]]    
@@ -91,6 +90,8 @@ func Process5xxRequest(c *gin.Context) {
 	if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack, "@") {
 		task.Slack = "#" + task.Slack
 	}
+
+	task.EmailArray = strings.Split(task.Email, ",")
 
 	t := template.Must(template.New("_5xxalerttemplate").Delims("[[", "]]").Parse(_5xxalerttemplate))
 	var sb bytes.Buffer

@@ -80,19 +80,20 @@ type MemoryTaskList struct {
 }
 
 type MemoryTaskSpec struct {
-	ID     string             `json:"id"`
-	Type   string             `json:"type"`
-	Dbrps  []structs.DbrpSpec `json:"dbrps"`
-	Status string             `json:"status"`
-	Script string             `json:"script"`
-	App    string             `json:"app"`
-	Crit   string             `json:"crit"`
-	Warn   string             `json:"warn"`
-	Slack  string             `json:"slack"`
-	Window string             `json:"window"`
-	Every  string             `json:"every"`
-	Post   string             `json:"post"`
-	Email  string             `json:"email"`
+	ID         string             `json:"id"`
+	Type       string             `json:"type"`
+	Dbrps      []structs.DbrpSpec `json:"dbrps"`
+	Status     string             `json:"status"`
+	Script     string             `json:"script"`
+	App        string             `json:"app"`
+	Crit       string             `json:"crit"`
+	Warn       string             `json:"warn"`
+	Slack      string             `json:"slack"`
+	Window     string             `json:"window"`
+	Every      string             `json:"every"`
+	Post       string             `json:"post"`
+	Email      string             `json:"email"`
+	EmailArray []string           `json:"emailarray"`
 	//    Opsgenie string         `json:"opsgenie"`
 	Dynotype string                 `json:"dynotype"`
 	Metric   string                 `json:"metric"`
