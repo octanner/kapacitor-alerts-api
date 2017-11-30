@@ -53,19 +53,20 @@ type _5xxVars struct {
 }
 
 type _5xxTaskSpec struct {
-	ID        string                 `json:id"`
-	Type      string                 `json:"type"`
-	Dbrps     []structs.DbrpSpec     `json:"dbrps"`
-	Status    string                 `json:"status"`
-	Script    string                 `json:"script"`
-	App       string                 `json:"app"`
-	Fqdn      string                 `json:"fqdn"`
-	Tolerance string                 `json:"tolerance"`
-	Sigma     string                 `json:"sigma"`
-	Slack     string                 `json:"slack"`
-	Post      string                 `json:"post"`
-	Email     string                 `json:"email"`
-	Vars      map[string]structs.Var `json:"vars"`
+	ID         string                 `json:id"`
+	Type       string                 `json:"type"`
+	Dbrps      []structs.DbrpSpec     `json:"dbrps"`
+	Status     string                 `json:"status"`
+	Script     string                 `json:"script"`
+	App        string                 `json:"app"`
+	Fqdn       string                 `json:"fqdn"`
+	Tolerance  string                 `json:"tolerance"`
+	Sigma      string                 `json:"sigma"`
+	Slack      string                 `json:"slack"`
+	Post       string                 `json:"post"`
+	Email      string                 `json:"email"`
+	EmailArray []string               `json:"emailarray"`
+	Vars       map[string]structs.Var `json:"vars"`
 }
 
 type _5xxTaskList struct {

@@ -37,9 +37,8 @@ select mean(value)/1024/1024 as value from "opentsdb"."autogen"."[[ .Metric ]]" 
 <h3>{{ .Message }}</h3>
 <h3>Value: {{ index .Fields "rvalue" }}</h3>
 ''')
-        [[if .Email]]
-        .email('[[ .Email ]]')
-        [[end]]
+        [[if .Email]][[ range $email := .EmailArray ]] 
+        .email('[[ $email ]]')[[end]][[end]]
         [[if .Post]]
         .post('[[ .Post ]]')
         [[end]]
@@ -105,9 +104,12 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	task.Dbrps = dbrps
 	task.Script = ""
 	task.Status = "enabled"
+
 	if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack, "@") {
 		task.Slack = "#" + task.Slack
 	}
+
+	task.EmailArray = strings.Split(task.Email, ",")
 
 	t := template.Must(template.New("memoryalerttemplate").Delims("[[", "]]").Parse(memoryalerttemplate))
 	var sb bytes.Buffer
