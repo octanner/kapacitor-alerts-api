@@ -44,7 +44,6 @@ select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqd
  
 `
 
-//https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=obertbin-voltron.alamoapp.octanner.io&from=now-1h&to=now&panelId=4&fullscreen
 
 func Process5xxRequest(c *gin.Context) {
 	var vars map[string]structs.Var
@@ -194,7 +193,7 @@ func Delete5xxTask(c *gin.Context) {
 
 	var task _5xxTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*5xx", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -287,7 +286,7 @@ func Get5xxTask(c *gin.Context) {
 
 	var tasktoreturn _5xxTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*5xx", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -337,7 +336,7 @@ func Get5xxTask(c *gin.Context) {
 func List5xxTasks(c *gin.Context) {
 	var tasks []_5xxTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*5xx", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
