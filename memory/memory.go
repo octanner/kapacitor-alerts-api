@@ -45,7 +45,6 @@ select mean(value)/1024/1024 as value from "opentsdb"."autogen"."[[ .Metric ]]" 
 
 `
 
-//       .opsGenie().recipients(['[[ .Opsgenie ]]'])
 
 func ProcessInstanceMemoryRequest(c *gin.Context) {
 	var vars map[string]structs.Var
@@ -253,7 +252,7 @@ func DeleteMemoryTask(c *gin.Context) {
 
 	var task MemoryTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -305,7 +304,7 @@ func GetMemoryTask(c *gin.Context) {
 
 	var tasktoreturn MemoryTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -356,7 +355,7 @@ func GetMemoryTask(c *gin.Context) {
 func GetMemoryTasksForApp(c *gin.Context) {
 	var tasks []MemoryTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -425,7 +424,7 @@ func convertToSimpleMemoryTask(id string, vars MemoryVars) (t MemoryTaskSpec, e 
 func ListMemoryTasks(c *gin.Context) {
 	var tasks []MemoryTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
