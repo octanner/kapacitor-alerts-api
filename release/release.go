@@ -41,7 +41,6 @@ select text,title,app from "opentsdb"."autogen"."events" where "app"='[[ .App ]]
 
 `
 
-
 func ProcessReleaseRequest(c *gin.Context) {
 	var vars map[string]structs.Var
 	vars = make(map[string]structs.Var)
@@ -96,7 +95,6 @@ func ProcessReleaseRequest(c *gin.Context) {
 	}
 	swr.Flush()
 	task.Script = string(sb.Bytes())
-fmt.Println(task.ID)
 	vars = addvar("app", task.App, "string", vars)
 	vars = addvar("slack", task.Slack, "string", vars)
 	vars = addvar("post", task.Post, "string", vars)
@@ -247,7 +245,7 @@ func DeleteReleaseTask(c *gin.Context) {
 		c.JSON(500, er)
 		return
 	}
-    
+
 	var tasklist ReleaseTaskList
 	err = json.Unmarshal(bodybytes, &tasklist)
 	if err != nil {
@@ -360,15 +358,15 @@ func GetReleaseTaskForApp(c *gin.Context) {
 		c.JSON(500, er)
 		return
 	}
- var simpletask ReleaseTaskSpec
+	var simpletask ReleaseTaskSpec
 	for _, element := range tasklist.Tasks {
-	//	if strings.HasPrefix(element.ID, c.Param("app")) {
-			simpletask, err = convertToSimpleReleaseTask(element.ID, element.Vars)
-			if err != nil {
-				fmt.Println(err)
-			}
-	///		tasks = append(tasks, simpletask)
-	//	}
+		//	if strings.HasPrefix(element.ID, c.Param("app")) {
+		simpletask, err = convertToSimpleReleaseTask(element.ID, element.Vars)
+		if err != nil {
+			fmt.Println(err)
+		}
+		///		tasks = append(tasks, simpletask)
+		//	}
 	}
 	c.JSON(200, simpletask)
 }
@@ -377,7 +375,7 @@ func convertToSimpleReleaseTask(id string, vars ReleaseVars) (t ReleaseTaskSpec,
 	var tasktoreturn ReleaseTaskSpec
 	tasktoreturn.ID = id
 	tasktoreturn.App = vars.App.Value
-        tasktoreturn.Type = vars.Type.Value
+	tasktoreturn.Type = vars.Type.Value
 	tasktoreturn.Slack = vars.Slack.Value
 	tasktoreturn.Email = vars.Email.Value
 	tasktoreturn.Post = vars.Post.Value
