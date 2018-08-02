@@ -28,6 +28,7 @@ func main() {
         router.GET("/task/release/:app", release.GetReleaseTaskForApp)
         router.PATCH("/task/release", release.ProcessReleaseRequest)
         router.DELETE("/task/release/:app", release.DeleteReleaseTask)
+        router.GET("/tasks/release", release.ListReleaseTasks)
 	router.Run()
 
 }

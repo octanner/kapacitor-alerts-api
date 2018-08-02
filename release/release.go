@@ -386,7 +386,7 @@ func convertToSimpleReleaseTask(id string, vars ReleaseVars) (t ReleaseTaskSpec,
 func ListReleaseTasks(c *gin.Context) {
 	var tasks []ReleaseTaskSpec
 	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.release_total-*", nil)
+	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-release", nil)
 	if err != nil {
 		fmt.Println(err)
 		var er structs.ErrorResponse
@@ -422,7 +422,7 @@ func ListReleaseTasks(c *gin.Context) {
 	}
 
 	for _, element := range tasklist.Tasks {
-		if strings.Contains(element.ID, "sample.release_total") {
+		if strings.Contains(element.ID, "-release") {
 			simpletask, err := convertToSimpleReleaseTask(element.ID, element.Vars)
 			if err != nil {
 				fmt.Println(err)
