@@ -5,6 +5,7 @@ import (
 	_5xx "kapacitor-alerts-api/5xx"
 	memory "kapacitor-alerts-api/memory"
         release "kapacitor-alerts-api/release"
+        crashed "kapacitor-alerts-api/crashed"
 )
 
 func main() {
@@ -29,6 +30,12 @@ func main() {
         router.PATCH("/task/release", release.ProcessReleaseRequest)
         router.DELETE("/task/release/:app", release.DeleteReleaseTask)
         router.GET("/tasks/release", release.ListReleaseTasks)
+
+        router.POST("/task/crashed", crashed.ProcessCrashedRequest)
+        router.GET("/task/crashed/:app", crashed.GetCrashedTaskForApp)
+        router.PATCH("/task/crashed", crashed.ProcessCrashedRequest)
+        router.DELETE("/task/crashed/:app", crashed.DeleteCrashedTask)
+        router.GET("/tasks/crashed", crashed.ListCrashedTasks)
 	router.Run()
 
 }
