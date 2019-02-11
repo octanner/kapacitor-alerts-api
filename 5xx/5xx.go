@@ -27,6 +27,7 @@ select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqd
     |alert()
         .crit(lambda: "sigma" > [[ .Sigma ]])
         .warn(lambda: ("sigma" <= [[ .Sigma ]] AND "sigma" >= 0.1) )
+        .stateChangesOnly()
         [[if .Slack ]]
         .slack()
         .channel('[[ .Slack ]]')
