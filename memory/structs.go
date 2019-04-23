@@ -2,6 +2,8 @@ package memory
 
 import (
 	structs "kapacitor-alerts-api/structs"
+
+	"gopkg.in/guregu/null.v3/zero"
 )
 
 type MemoryVars struct {
@@ -98,4 +100,18 @@ type MemoryTaskSpec struct {
 	Dynotype string                 `json:"dynotype"`
 	Metric   string                 `json:"metric"`
 	Vars     map[string]structs.Var `json:"vars"`
+}
+
+// MemoryDBTask - Used for retrieval of task information from the database
+type MemoryDBTask struct {
+	ID       string      `json:"id"`
+	App      string      `json:"app"`
+	Dynotype string      `json:"dynotype"`
+	Crit     int         `json:"crit"`
+	Warn     int         `json:"warn"`
+	Wind     string      `json:"window"`
+	Every    string      `json:"every"`
+	Slack    zero.String `json:"slack"`
+	Post     zero.String `json:"post"`
+	Email    zero.String `json:"email"`
 }

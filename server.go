@@ -1,16 +1,51 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"io/ioutil"
 	_5xx "kapacitor-alerts-api/5xx"
+	crashed "kapacitor-alerts-api/crashed"
 	memory "kapacitor-alerts-api/memory"
-        release "kapacitor-alerts-api/release"
-        crashed "kapacitor-alerts-api/crashed"
+	release "kapacitor-alerts-api/release"
+	"kapacitor-alerts-api/utils"
+	"log"
+
+	"os"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
 
-func main() {
+// InitDB - Run any available creation and migration scripts
+func InitDB(db *sqlx.DB) {
+	buf, err := ioutil.ReadFile("./create.sql")
+	if err != nil {
+		log.Println("Error: Unable to run migration scripts, could not load create.sql.")
+		log.Fatalln(err)
+	}
+	_, err = db.Query(string(buf))
+	if err != nil {
+		log.Println("Error: Unable to run migration scripts, execution failed.")
+		log.Fatalln(err)
+	}
+}
 
+// DbMiddleware - Add a SQL database connection to the Gin context
+func DbMiddleware(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("db", db)
+		c.Next()
+	}
+}
+
+func main() {
 	router := gin.Default()
+
+	url := os.Getenv("DATABASE_URL")
+	pool := utils.GetDB(url)
+	InitDB(pool)
+
+	router.Use(DbMiddleware(pool))
+
 	router.POST("/task/memory", memory.ProcessInstanceMemoryRequest)
 	router.PATCH("/task/memory", memory.ProcessInstanceMemoryRequest)
 	router.DELETE("/task/memory/:app/:id", memory.DeleteMemoryTask)
@@ -22,20 +57,20 @@ func main() {
 	router.PATCH("/task/5xx", _5xx.Process5xxRequest)
 	router.DELETE("/task/5xx/:app", _5xx.Delete5xxTask)
 	router.GET("/task/5xx/:app", _5xx.Get5xxTask)
-        router.GET("/task/5xx/:app/state", _5xx.Get5xxTaskState)
+	router.GET("/task/5xx/:app/state", _5xx.Get5xxTaskState)
 	router.GET("/tasks/5xx", _5xx.List5xxTasks)
 
-        router.POST("/task/release", release.ProcessReleaseRequest)
-        router.GET("/task/release/:app", release.GetReleaseTaskForApp)
-        router.PATCH("/task/release", release.ProcessReleaseRequest)
-        router.DELETE("/task/release/:app", release.DeleteReleaseTask)
-        router.GET("/tasks/release", release.ListReleaseTasks)
+	router.POST("/task/release", release.ProcessReleaseRequest)
+	router.GET("/task/release/:app", release.GetReleaseTaskForApp)
+	router.PATCH("/task/release", release.ProcessReleaseRequest)
+	router.DELETE("/task/release/:app", release.DeleteReleaseTask)
+	router.GET("/tasks/release", release.ListReleaseTasks)
 
-        router.POST("/task/crashed", crashed.ProcessCrashedRequest)
-        router.GET("/task/crashed/:app", crashed.GetCrashedTaskForApp)
-        router.PATCH("/task/crashed", crashed.ProcessCrashedRequest)
-        router.DELETE("/task/crashed/:app", crashed.DeleteCrashedTask)
-        router.GET("/tasks/crashed", crashed.ListCrashedTasks)
+	router.POST("/task/crashed", crashed.ProcessCrashedRequest)
+	router.GET("/task/crashed/:app", crashed.GetCrashedTaskForApp)
+	router.PATCH("/task/crashed", crashed.ProcessCrashedRequest)
+	router.DELETE("/task/crashed/:app", crashed.DeleteCrashedTask)
+	router.GET("/tasks/crashed", crashed.ListCrashedTasks)
+
 	router.Run()
-
 }

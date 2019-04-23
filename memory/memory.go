@@ -3,87 +3,102 @@ package memory
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/json"
-	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	structs "kapacitor-alerts-api/structs"
+	utils "kapacitor-alerts-api/utils"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/gin-gonic/gin"
 )
 
 const memoryalerttemplate = `
-batch
-    |query('''
-select mean(value)/1024/1024 as value from "opentsdb"."autogen"."[[ .Metric ]]" where "app"='[[ .App ]]' and "dyno" [[ .Dynotype ]]
-    ''')
+	batch
+    |	query('''
+				select mean(value)/1024/1024 as value from "opentsdb"."autogen"."[[ .Metric ]]" where "app"='[[ .App ]]' and "dyno" [[ .Dynotype ]]
+    	''')
         .period([[ .Window ]])
         .every([[ .Every ]])
         .groupBy('app','dyno')
-    |eval(lambda: ceil("value")).as('rvalue').keep('value','rvalue')
-    |alert()
+    |	eval(lambda: ceil("value")).as('rvalue').keep('value','rvalue')
+    |	alert()
         .crit(lambda: "value" > [[ .Crit ]])
         .warn(lambda: "value" > [[ .Warn ]])
         .stateChangesOnly()
         [[if .Slack ]]
-        .slack()
-        .channel('[[ .Slack ]]')
+        	.slack()
+        	.channel('[[ .Slack ]]')
         [[end]]
         .message('Memory is {{ .Level }} for {{ .Group }} : {{ index .Fields "rvalue" }} MB - limits [[ .Warn ]]/[[ .Crit ]]')
         .details('''
-<h3>{{ .Message }}</h3>
-<h3>Value: {{ index .Fields "rvalue" }}</h3>
-''')
-        [[if .Email]][[ range $email := .EmailArray ]] 
-        .email('[[ $email ]]')[[end]][[end]]
+					<h3>{{ .Message }}</h3>
+					<h3>Value: {{ index .Fields "rvalue" }}</h3>
+				''')
+				[[if .Email]]
+					[[ range $email := .EmailArray ]] 
+						.email('[[ $email ]]')
+					[[end]]
+				[[end]]
         [[if .Post]]
-        .post('[[ .Post ]]')
+        	.post('[[ .Post ]]')
         [[end]]
-
 `
 
+// addvar - Add a variable to a map[string]structs.Var -
+//				 	$name: { Type: $type, Description: $name, Value: $value}
+func addvar(name string, value string, vtype string, flistin map[string]structs.Var) (flistout map[string]structs.Var) {
+	if value != "" {
+		var var1 structs.Var
+		if vtype == "string" {
+			var1.Value = value
+		}
+		if vtype == "int" {
+			intvalue, _ := strconv.Atoi(value)
+			var1.Value = intvalue
+		}
+		var1.Type = vtype
+		var1.Description = name
+		flistin[name] = var1
+	}
+	return flistin
+}
 
+// ProcessInstanceMemoryRequest - Create structs for creating and updating memory tasks
 func ProcessInstanceMemoryRequest(c *gin.Context) {
 	var vars map[string]structs.Var
 	vars = make(map[string]structs.Var)
-
-	bodybytes, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
 	var dbrps []structs.DbrpSpec
 	var dbrp structs.DbrpSpec
 	var task MemoryTaskSpec
+
+	bodybytes, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		utils.ReportError(err, c, "Server Error while reading response")
+		return
+	}
+
 	err = json.Unmarshal(bodybytes, &task)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
 
 	task.ID = task.App + "-memory"
-
 	task.Metric = "sample.memory_total"
 	vars = addvar("metric", task.Metric, "string", vars)
 	vars = addvar("dynotyperequest", task.Dynotype, "string", vars)
+
 	if task.Dynotype != "all" {
 		task.ID = task.App + "-" + task.Metric + "-" + task.Dynotype
-		vars = addvar("id", task.ID, "string", vars)
-
-	}
-	if task.Dynotype == "all" {
+	} else {
 		task.ID = task.App + "-" + task.Metric + "-all"
-		vars = addvar("id", task.ID, "string", vars)
 	}
+	vars = addvar("id", task.ID, "string", vars)
 
 	task.Type = "batch"
 	vars = addvar("type", task.Type, "string", vars)
@@ -91,6 +106,7 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	dbrp.Db = "opentsdb"
 	dbrp.Rp = "autogen"
 	dbrps = append(dbrps, dbrp)
+
 	if task.Dynotype == "all" {
 		task.Dynotype = " =~ /.*/ "
 	} else if task.Dynotype == "web" {
@@ -111,16 +127,15 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	task.EmailArray = strings.Split(task.Email, ",")
 
 	t := template.Must(template.New("memoryalerttemplate").Delims("[[", "]]").Parse(memoryalerttemplate))
+
 	var sb bytes.Buffer
 	swr := bufio.NewWriter(&sb)
 	err = t.Execute(swr, task)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	swr.Flush()
 	task.Script = string(sb.Bytes())
 	vars = addvar("app", task.App, "string", vars)
@@ -136,359 +151,215 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 
 	bodybytes, err = json.Marshal(task)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
-	if c.Request.Method == "DELETE" {
-		deleteInstanceMemoryTask(task, c)
-		c.String(200, "")
-	}
+
 	if c.Request.Method == "POST" {
 		createInstanceMemoryTask(task, c)
-	}
-	if c.Request.Method == "PATCH" {
-		deleteInstanceMemoryTask(task, c)
+	} else if c.Request.Method == "PATCH" {
+		deleteInstanceMemoryTask(task.ID, c)
 		createInstanceMemoryTask(task, c)
 	}
-
 }
 
-func deleteInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
-	client := http.Client{}
-	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+task.ID, nil)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	defer resp.Body.Close()
-	bodybytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	if resp.StatusCode != 204 {
-		fmt.Println(string(bodybytes))
-		var er structs.ErrorResponse
-		err = json.Unmarshal(bodybytes, &er)
-		if err != nil {
-			fmt.Println(err)
-		}
-		c.JSON(500, er)
-		return
-
-	}
-}
-
+// createInstanceMemoryTask - Create memory task in Kapacitor and the database
 func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
+	db, err := utils.GetDBFromContext(c)
+	if err != nil {
+		utils.ReportError(err, c, "Unable to access database")
+		return
+	}
 
 	client := http.Client{}
 
 	p, err := json.Marshal(task)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	req, err := http.NewRequest("POST", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", bytes.NewBuffer(p))
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	if resp.StatusCode != 200 {
-		fmt.Println(string(bodybytes))
 		var er structs.ErrorResponse
 		err = json.Unmarshal(bodybytes, &er)
-		if err != nil {
-			fmt.Println(err)
-		}
-		c.JSON(500, er)
+		utils.ReportError(err, c, "")
 		return
-
 	}
+
+	_, err = db.Exec(
+		"insert into memory_tasks values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		task.ID, task.App, task.Vars["dynotyperequest"].Value, task.Crit, task.Warn,
+		task.Window, task.Every, task.Slack, task.Post, task.Email,
+	)
+
+	if err != nil {
+		utils.ReportError(err, c, "Unable to save to database")
+		return
+	}
+
 	c.String(201, "")
-
 }
 
+// DeleteMemoryTask - Verify that a task exists in the database before talking to Kapacitor
 func DeleteMemoryTask(c *gin.Context) {
+	app := c.Param("app")
+	id := c.Param("id")
 
-	var task MemoryTaskSpec
-	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
+	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
+
+	task := MemoryDBTask{}
+
+	err = db.Get(&task, "select * from memory_tasks where id=$1 and app=$2", id, app)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.ReportInvalidRequest(c, "Task not found")
+		} else {
+			utils.ReportError(err, c, "Unable to access database")
+		}
+		return
+	}
+
+	deleteInstanceMemoryTask(task.ID, c)
+	c.String(200, "")
+}
+
+// deleteInstanceMemoryTask - Delete memory task from Kapacitor and the database
+func deleteInstanceMemoryTask(id string, c *gin.Context) {
+	db, err := utils.GetDBFromContext(c)
+	if err != nil {
+		utils.ReportError(err, c, "Unable to access database")
+		return
+	}
+
+	client := http.Client{}
+	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+id, nil)
+	if err != nil {
+		utils.ReportError(err, c, "Server Error while reading response")
+		return
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
+
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
-	var tasklist MemoryTaskList
-	err = json.Unmarshal(bodybytes, &tasklist)
+
+	if resp.StatusCode != 204 {
+		var er structs.ErrorResponse
+		err = json.Unmarshal(bodybytes, &er)
+		utils.ReportError(err, c, "")
+		return
+	}
+
+	_, err = db.Exec("delete from memory_tasks where id=$1", id)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
-	for _, element := range tasklist.Tasks {
-		if strings.HasPrefix(element.ID, c.Param("app")) && strings.HasSuffix(element.ID, "-"+c.Param("id")) {
-			simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
-			if err != nil {
-				fmt.Println(err)
-			}
-			task = simpletask
-
-		}
-	}
-	deleteInstanceMemoryTask(task, c)
-
 }
 
+// GetMemoryTask - Get the config of a specific memory task from the database
 func GetMemoryTask(c *gin.Context) {
+	app := c.Param("app")
+	id := c.Param("id")
 
-	var tasktoreturn MemoryTaskSpec
-	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
+	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	defer resp.Body.Close()
-	bodybytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	var tasklist MemoryTaskList
-	err = json.Unmarshal(bodybytes, &tasklist)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	for _, element := range tasklist.Tasks {
-		if strings.HasPrefix(element.ID, c.Param("app")) && strings.HasSuffix(element.ID, "-"+c.Param("id")) {
-			simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
-			if err != nil {
-				fmt.Println(err)
-			}
-			tasktoreturn = simpletask
 
+	task := MemoryDBTask{}
+
+	err = db.Get(&task, "select * from memory_tasks where id=$1 and app=$2", id, app)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(200, nil)
+		} else {
+			utils.ReportError(err, c, "Unable to access database")
 		}
+		return
 	}
-	c.JSON(200, tasktoreturn)
 
+	c.JSON(200, task)
 }
 
+// GetMemoryTasksForApp - Get the config of all memory tasks for an app from the database
 func GetMemoryTasksForApp(c *gin.Context) {
-	var tasks []MemoryTaskSpec
-	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
+	app := c.Param("app")
+
+	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	defer resp.Body.Close()
-	bodybytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	var tasklist MemoryTaskList
-	err = json.Unmarshal(bodybytes, &tasklist)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
 
-	for _, element := range tasklist.Tasks {
-		if strings.HasPrefix(element.ID, c.Param("app")) {
-			simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
-			if err != nil {
-				fmt.Println(err)
-			}
-			tasks = append(tasks, simpletask)
+	tasks := []MemoryDBTask{}
 
-		}
+	err = db.Select(&tasks, "select * from memory_tasks where app=$1", app)
+	if err != nil {
+		utils.ReportError(err, c, "Unable to access database")
+		return
 	}
+
+	if len(tasks) == 0 {
+		c.JSON(200, nil)
+		return
+	}
+
 	c.JSON(200, tasks)
 }
 
-func convertToSimpleMemoryTask(id string, vars MemoryVars) (t MemoryTaskSpec, e error) {
-	var tasktoreturn MemoryTaskSpec
-	tasktoreturn.ID = id
-	tasktoreturn.App = vars.App.Value
-
-	tasktoreturn.Dynotype = vars.Dynotyperequest.Value
-
-	tasktoreturn.Window = vars.Window.Value
-	tasktoreturn.Every = vars.Every.Value
-	tasktoreturn.Crit = strconv.Itoa(vars.Crit.Value)
-	tasktoreturn.Warn = strconv.Itoa(vars.Warn.Value)
-	tasktoreturn.Slack = vars.Slack.Value
-	tasktoreturn.Email = vars.Email.Value
-	tasktoreturn.Post = vars.Post.Value
-
-	return tasktoreturn, nil
-}
-
+// ListMemoryTasks - Get the config of all memory tasks from the database
 func ListMemoryTasks(c *gin.Context) {
-	var tasks []MemoryTaskSpec
-	client := http.Client{}
-	req, err := http.NewRequest("GET", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks?pattern=*-sample.memory_total-*", nil)
+	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	defer resp.Body.Close()
-	bodybytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
-		return
-	}
-	var tasklist MemoryTaskList
-	err = json.Unmarshal(bodybytes, &tasklist)
-	if err != nil {
-		fmt.Println(err)
-		var er structs.ErrorResponse
-		er.Error = "Server Error while reading response"
-		c.JSON(500, er)
+		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
 
-	for _, element := range tasklist.Tasks {
-		if strings.Contains(element.ID, "sample.memory_total") {
-			simpletask, err := convertToSimpleMemoryTask(element.ID, element.Vars)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if simpletask.App != "" {
-				tasks = append(tasks, simpletask)
-			}
-		}
+	tasks := []MemoryDBTask{}
+
+	err = db.Select(&tasks, "select * from memory_tasks order by app asc")
+	if err != nil {
+		utils.ReportError(err, c, "Unable to access database")
+		return
 	}
+
+	if len(tasks) == 0 {
+		c.JSON(200, nil)
+		return
+	}
+
 	c.JSON(200, tasks)
-}
-
-func addvar(name string, value string, vtype string, flistin map[string]structs.Var) (flistout map[string]structs.Var) {
-	if value != "" {
-		var var1 structs.Var
-		if vtype == "string" {
-			var1.Value = value
-		}
-		if vtype == "int" {
-			intvalue, _ := strconv.Atoi(value)
-			var1.Value = intvalue
-		}
-
-		var1.Type = vtype
-		var1.Description = name
-		flistin[name] = var1
-
-	}
-	return flistin
-
 }
