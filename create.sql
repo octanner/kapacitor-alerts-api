@@ -22,11 +22,8 @@ begin
 
   CREATE TABLE IF NOT EXISTS _5xx_tasks 
   (
-    id TEXT NOT NULL,                                   -- ID of task (from kapacitor)
-    app TEXT NOT NULL,                                  -- Name of app to monitor
-    fqdn INTEGER NOT NULL,                              -- URL of app
+    app TEXT NOT NULL UNIQUE,                           -- Name of app to monitor
     tolerance INTEGER NOT NULL,                         -- How sensitive should checks be? [low, medium, high]
-    sigma TEXT NOT NULL,                                -- Current sensitivity score
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
     email TEXT,                                         -- Email address to notify

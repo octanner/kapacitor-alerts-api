@@ -10,7 +10,6 @@ import (
 	utils "kapacitor-alerts-api/utils"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -49,25 +48,6 @@ const memoryalerttemplate = `
         [[end]]
 `
 
-// addvar - Add a variable to a map[string]structs.Var -
-//				 	$name: { Type: $type, Description: $name, Value: $value}
-func addvar(name string, value string, vtype string, flistin map[string]structs.Var) (flistout map[string]structs.Var) {
-	if value != "" {
-		var var1 structs.Var
-		if vtype == "string" {
-			var1.Value = value
-		}
-		if vtype == "int" {
-			intvalue, _ := strconv.Atoi(value)
-			var1.Value = intvalue
-		}
-		var1.Type = vtype
-		var1.Description = name
-		flistin[name] = var1
-	}
-	return flistin
-}
-
 // ProcessInstanceMemoryRequest - Create structs for creating and updating memory tasks
 func ProcessInstanceMemoryRequest(c *gin.Context) {
 	var vars map[string]structs.Var
@@ -90,18 +70,18 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 
 	task.ID = task.App + "-memory"
 	task.Metric = "sample.memory_total"
-	vars = addvar("metric", task.Metric, "string", vars)
-	vars = addvar("dynotyperequest", task.Dynotype, "string", vars)
+	vars = utils.AddVar("metric", task.Metric, "string", vars)
+	vars = utils.AddVar("dynotyperequest", task.Dynotype, "string", vars)
 
 	if task.Dynotype != "all" {
 		task.ID = task.App + "-" + task.Metric + "-" + task.Dynotype
 	} else {
 		task.ID = task.App + "-" + task.Metric + "-all"
 	}
-	vars = addvar("id", task.ID, "string", vars)
+	vars = utils.AddVar("id", task.ID, "string", vars)
 
 	task.Type = "batch"
-	vars = addvar("type", task.Type, "string", vars)
+	vars = utils.AddVar("type", task.Type, "string", vars)
 
 	dbrp.Db = "opentsdb"
 	dbrp.Rp = "autogen"
@@ -114,7 +94,7 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	} else {
 		task.Dynotype = " =~ /" + task.Dynotype + "/ "
 	}
-	vars = addvar("dynotype", task.Dynotype, "string", vars)
+	vars = utils.AddVar("dynotype", task.Dynotype, "string", vars)
 
 	task.Dbrps = dbrps
 	task.Script = ""
@@ -138,14 +118,14 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 
 	swr.Flush()
 	task.Script = string(sb.Bytes())
-	vars = addvar("app", task.App, "string", vars)
-	vars = addvar("crit", task.Crit, "int", vars)
-	vars = addvar("warn", task.Warn, "int", vars)
-	vars = addvar("slack", task.Slack, "string", vars)
-	vars = addvar("window", task.Window, "string", vars)
-	vars = addvar("every", task.Every, "string", vars)
-	vars = addvar("post", task.Post, "string", vars)
-	vars = addvar("email", task.Email, "string", vars)
+	vars = utils.AddVar("app", task.App, "string", vars)
+	vars = utils.AddVar("crit", task.Crit, "int", vars)
+	vars = utils.AddVar("warn", task.Warn, "int", vars)
+	vars = utils.AddVar("slack", task.Slack, "string", vars)
+	vars = utils.AddVar("window", task.Window, "string", vars)
+	vars = utils.AddVar("every", task.Every, "string", vars)
+	vars = utils.AddVar("post", task.Post, "string", vars)
+	vars = utils.AddVar("email", task.Email, "string", vars)
 
 	task.Vars = vars
 
