@@ -55,6 +55,8 @@ These are the variables used in this documentation:
 - *EMAIL*: Email address to notify
 - *POST*: URL to notify via webhook
 
+**NOTE**: At least one of the notification options must be used (slack, email, post)
+
 ## 5xx
 
 ### 1. Get All Tasks
