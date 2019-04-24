@@ -49,7 +49,7 @@ begin
 
   CREATE TABLE IF NOT EXISTS released_tasks
   (
-    app TEXT NOT NULL,                                  -- Name of app to monitor
+    app TEXT NOT NULL UNIQUE,                           -- Name of app to monitor
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
     email TEXT,                                         -- Email address to notify
