@@ -67,7 +67,7 @@ func main() {
 	router.GET("/tasks/release", release.ListReleaseTasks)
 
 	router.POST("/task/crashed", crashed.ProcessCrashedRequest)
-	router.GET("/task/crashed/:app", crashed.GetCrashedTaskForApp)
+	router.GET("/task/crashed/:app", crashed.GetCrashedTask)
 	router.PATCH("/task/crashed", crashed.ProcessCrashedRequest)
 	router.DELETE("/task/crashed/:app", crashed.DeleteCrashedTask)
 	router.GET("/tasks/crashed", crashed.ListCrashedTasks)

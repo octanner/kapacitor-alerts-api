@@ -68,7 +68,7 @@ func getTaskByID(id string, c *gin.Context) (*MemoryDBTask, error) {
 	return &task, nil
 }
 
-// ProcessInstanceMemoryRequest - Create structs for creating and updating memory tasks
+// ProcessInstanceMemoryRequest - POST | PATCH /task/memory
 func ProcessInstanceMemoryRequest(c *gin.Context) {
 	var vars map[string]structs.Var
 	vars = make(map[string]structs.Var)
@@ -156,8 +156,14 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	}
 
 	if c.Request.Method == "POST" {
-		createInstanceMemoryTask(task, c)
-	} else if c.Request.Method == "PATCH" {
+		err = createInstanceMemoryTask(task, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
+	}
+
+	if c.Request.Method == "PATCH" {
 		// Check if task exists before trying to patch it
 		_, err := getTaskByID(task.ID, c)
 		if err != nil {
@@ -168,51 +174,60 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 			}
 			return
 		}
-		deleteInstanceMemoryTask(task.ID, c)
-		createInstanceMemoryTask(task, c)
+
+		err = deleteInstanceMemoryTask(task.ID, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
+
+		err = createInstanceMemoryTask(task, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
 	}
+
+	c.String(201, "")
 }
 
-// createInstanceMemoryTask - Create memory task in Kapacitor and the database
-func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
+// createInstanceMemoryTask - Create memory task in Kapacitor and save config to the database
+func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
 
 	client := http.Client{}
 
 	p, err := json.Marshal(task)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	req, err := http.NewRequest("POST", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", bytes.NewBuffer(p))
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	if resp.StatusCode != 200 {
 		var er structs.ErrorResponse
 		err = json.Unmarshal(bodybytes, &er)
-		utils.ReportError(err, c, "")
-		return
+		if err != nil {
+			return errors.New("Server Error while reading response")
+		}
+		return errors.New(er.Error)
 	}
 
 	_, err = db.Exec(
@@ -222,14 +237,13 @@ func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
 	)
 
 	if err != nil {
-		utils.ReportError(err, c, "Unable to save to database")
-		return
+		return errors.New("Unable to save to database")
 	}
 
-	c.String(201, "")
+	return nil
 }
 
-// DeleteMemoryTask - Verify that a task exists in the database before talking to Kapacitor
+// DeleteMemoryTask - DELETE /task/memory/:app/:id
 func DeleteMemoryTask(c *gin.Context) {
 	id := c.Param("id")
 
@@ -244,53 +258,57 @@ func DeleteMemoryTask(c *gin.Context) {
 		return
 	}
 
-	deleteInstanceMemoryTask(id, c)
+	err = deleteInstanceMemoryTask(id, c)
+	if err != nil {
+		utils.ReportError(err, c, "")
+		return
+	}
+
 	c.String(200, "")
 }
 
 // deleteInstanceMemoryTask - Delete memory task from Kapacitor and the database
-func deleteInstanceMemoryTask(id string, c *gin.Context) {
+func deleteInstanceMemoryTask(id string, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
 
 	client := http.Client{}
 	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+id, nil)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	if resp.StatusCode != 204 {
 		var er structs.ErrorResponse
 		err = json.Unmarshal(bodybytes, &er)
-		utils.ReportError(err, c, "")
-		return
+		if err != nil {
+			return errors.New("Server Error while reading response")
+		}
+		return errors.New(er.Error)
 	}
 
 	_, err = db.Exec("DELETE FROM memory_tasks WHERE id=$1", id)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
+
+	return nil
 }
 
-// GetMemoryTask - Get the config of a specific memory task from the database
+// GetMemoryTask - GET /task/memory/:app/:id
 func GetMemoryTask(c *gin.Context) {
 	id := c.Param("id")
 
@@ -307,7 +325,7 @@ func GetMemoryTask(c *gin.Context) {
 	c.JSON(200, task)
 }
 
-// GetMemoryTasksForApp - Get the config of all memory tasks for an app from the database
+// GetMemoryTasksForApp - GET /tasks/memory/:app
 func GetMemoryTasksForApp(c *gin.Context) {
 	app := c.Param("app")
 
@@ -333,7 +351,7 @@ func GetMemoryTasksForApp(c *gin.Context) {
 	c.JSON(200, tasks)
 }
 
-// ListMemoryTasks - Get the config of all memory tasks from the database
+// ListMemoryTasks - GET /tasks/memory
 func ListMemoryTasks(c *gin.Context) {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {

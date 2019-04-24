@@ -66,7 +66,7 @@ func getTaskByName(app string, c *gin.Context) (*_5xxDBTask, error) {
 	return &task, nil
 }
 
-// Process5xxRequest - Create structs for creating and updating 5xx tasks
+// Process5xxRequest - POST | PATCH /task/5xx
 func Process5xxRequest(c *gin.Context) {
 	var vars map[string]structs.Var
 	vars = make(map[string]structs.Var)
@@ -137,9 +137,17 @@ func Process5xxRequest(c *gin.Context) {
 		return
 	}
 
+	// POST - Create new task
 	if c.Request.Method == "POST" {
-		create5xxTask(task, c)
-	} else if c.Request.Method == "PATCH" {
+		err = create5xxTask(task, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
+	}
+
+	// PATCH - Recreate task
+	if c.Request.Method == "PATCH" {
 		// Check if task exists before trying to patch it
 		_, err := getTaskByName(task.App, c)
 		if err != nil {
@@ -150,51 +158,60 @@ func Process5xxRequest(c *gin.Context) {
 			}
 			return
 		}
-		delete5xxTask(task.App, c)
-		create5xxTask(task, c)
+
+		err = delete5xxTask(task.App, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
+
+		err = create5xxTask(task, c)
+		if err != nil {
+			utils.ReportError(err, c, "")
+			return
+		}
 	}
+
+	c.String(201, "")
 }
 
-// create5xxTask - Create a new task in Kapacitor and save it to the database
-func create5xxTask(task _5xxTaskSpec, c *gin.Context) {
+// create5xxTask - Create a new task in Kapacitor and save the config to the database
+func create5xxTask(task _5xxTaskSpec, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
 
 	client := http.Client{}
 
 	p, err := json.Marshal(task)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	req, err := http.NewRequest("POST", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks", bytes.NewBuffer(p))
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	if resp.StatusCode != 200 {
 		var er structs.ErrorResponse
 		err = json.Unmarshal(bodybytes, &er)
-		utils.ReportError(err, c, "")
-		return
+		if err != nil {
+			return errors.New("Server Error while reading response")
+		}
+		return errors.New(er.Error)
 	}
 
 	_, err = db.Exec(
@@ -203,14 +220,13 @@ func create5xxTask(task _5xxTaskSpec, c *gin.Context) {
 	)
 
 	if err != nil {
-		utils.ReportError(err, c, "Unable to save to database")
-		return
+		return errors.New("Unable to save to database")
 	}
 
-	c.String(201, "")
+	return nil
 }
 
-// Delete5xxTask - Verify that a task exists in the database before talking to Kapacitor
+// Delete5xxTask - DELETE /task/5xx/:app
 func Delete5xxTask(c *gin.Context) {
 	app := c.Param("app")
 
@@ -225,52 +241,58 @@ func Delete5xxTask(c *gin.Context) {
 		return
 	}
 
-	delete5xxTask(app, c)
+	// Delete task from Kapacitor and remove config from the database
+	err = delete5xxTask(app, c)
+	if err != nil {
+		utils.ReportError(err, c, "")
+		return
+	}
+
 	c.String(200, "")
 }
 
-func delete5xxTask(app string, c *gin.Context) {
+// delete5xxTask - Delete a task from Kapacitor and remove its config from the database
+func delete5xxTask(app string, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
 
 	client := http.Client{}
 	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+app+"-5xx", nil)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	defer resp.Body.Close()
 	bodybytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		utils.ReportError(err, c, "Server Error while reading response")
-		return
+		return errors.New("Server Error while reading response")
 	}
 
 	if resp.StatusCode != 204 {
 		var er structs.ErrorResponse
 		err = json.Unmarshal(bodybytes, &er)
-		utils.ReportError(err, c, "")
-		return
+		if err != nil {
+			return errors.New("Server Error while reading response")
+		}
+		return errors.New(er.Error)
 	}
 
 	_, err = db.Exec("DELETE FROM _5xx_tasks WHERE app=$1", app)
 	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
+		return errors.New("Unable to access database")
 	}
+
+	return nil
 }
 
-// Get5xxTask - Get the config of a specific 5xx task from the database
+// Get5xxTask - GET /task/5xx/:app
 func Get5xxTask(c *gin.Context) {
 	app := c.Param("app")
 
@@ -287,7 +309,7 @@ func Get5xxTask(c *gin.Context) {
 	c.JSON(200, task)
 }
 
-// List5xxTasks - Get the config of all 5xx tasks from the database
+// List5xxTasks - GET /tasks/5xx
 func List5xxTasks(c *gin.Context) {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
@@ -311,7 +333,7 @@ func List5xxTasks(c *gin.Context) {
 	c.JSON(200, tasks)
 }
 
-// Get5xxTaskState - Get the current state of a 5xx task for an app from Kapacitor
+// Get5xxTaskState - GET /task/5xx/:app/state
 func Get5xxTaskState(c *gin.Context) {
 	var stateresp _5xxSimpleTaskState
 	app := c.Param("app")

@@ -36,8 +36,7 @@ begin
 
   CREATE TABLE IF NOT EXISTS crashed_tasks
   (
-    id TEXT NOT NULL,                                   -- ID of task (from kapacitor)
-    app TEXT NOT NULL,                                  -- Name of app to monitor
+    app TEXT NOT NULL UNIQUE,                           -- Name of app to monitor
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
     email TEXT,                                         -- Email address to notify
@@ -50,7 +49,7 @@ begin
 
   CREATE TABLE IF NOT EXISTS release_tasks
   (
-    id TEXT NOT NULL,                                   -- ID of task (from kapacitor)
+    id TEXT NOT NULL UNIQUE,                            -- ID of task (from kapacitor)
     app TEXT NOT NULL,                                  -- Name of app to monitor
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
