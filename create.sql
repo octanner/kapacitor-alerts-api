@@ -47,9 +47,8 @@ begin
     )
   );
 
-  CREATE TABLE IF NOT EXISTS release_tasks
+  CREATE TABLE IF NOT EXISTS released_tasks
   (
-    id TEXT NOT NULL UNIQUE,                            -- ID of task (from kapacitor)
     app TEXT NOT NULL,                                  -- Name of app to monitor
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
