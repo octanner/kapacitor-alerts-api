@@ -23,7 +23,7 @@ begin
   CREATE TABLE IF NOT EXISTS _5xx_tasks 
   (
     app TEXT NOT NULL UNIQUE,                           -- Name of app to monitor
-    tolerance INTEGER NOT NULL,                         -- How sensitive should checks be? [low, medium, high]
+    tolerance TEXT NOT NULL,                            -- How sensitive should checks be? [low, medium, high]
     slack TEXT,                                         -- Slack channel to notify
     post TEXT,                                          -- HTTP endpoint to notify (POST)
     email TEXT,                                         -- Email address to notify

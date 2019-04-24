@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	structs "kapacitor-alerts-api/structs"
 	utils "kapacitor-alerts-api/utils"
@@ -47,6 +48,25 @@ const memoryalerttemplate = `
         	.post('[[ .Post ]]')
         [[end]]
 `
+
+// getTaskByID - Get a task from the database by its ID
+func getTaskByID(id string, c *gin.Context) (*MemoryDBTask, error) {
+	db, err := utils.GetDBFromContext(c)
+	if err != nil {
+		return nil, errors.New("Unable to access database")
+	}
+
+	task := MemoryDBTask{}
+
+	err = db.Get(&task, "SELECT * FROM memory_tasks WHERE id=$1", id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
+		return nil, errors.New("Unable to access database")
+	}
+	return &task, nil
+}
 
 // ProcessInstanceMemoryRequest - Create structs for creating and updating memory tasks
 func ProcessInstanceMemoryRequest(c *gin.Context) {
@@ -138,6 +158,16 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	if c.Request.Method == "POST" {
 		createInstanceMemoryTask(task, c)
 	} else if c.Request.Method == "PATCH" {
+		// Check if task exists before trying to patch it
+		_, err := getTaskByID(task.ID, c)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, nil)
+			} else {
+				utils.ReportError(err, c, "")
+			}
+			return
+		}
 		deleteInstanceMemoryTask(task.ID, c)
 		createInstanceMemoryTask(task, c)
 	}
@@ -186,7 +216,7 @@ func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
 	}
 
 	_, err = db.Exec(
-		"insert into memory_tasks values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+		"INSERT INTO memory_tasks VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
 		task.ID, task.App, task.Vars["dynotyperequest"].Value, task.Crit, task.Warn,
 		task.Window, task.Every, task.Slack, task.Post, task.Email,
 	)
@@ -201,28 +231,20 @@ func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) {
 
 // DeleteMemoryTask - Verify that a task exists in the database before talking to Kapacitor
 func DeleteMemoryTask(c *gin.Context) {
-	app := c.Param("app")
 	id := c.Param("id")
 
-	db, err := utils.GetDBFromContext(c)
-	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
-	}
-
-	task := MemoryDBTask{}
-
-	err = db.Get(&task, "select * from memory_tasks where id=$1 and app=$2", id, app)
+	// Check if task exists before trying to delete it
+	_, err := getTaskByID(id, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			utils.ReportInvalidRequest(c, "Task not found")
+			c.JSON(404, nil)
 		} else {
-			utils.ReportError(err, c, "Unable to access database")
+			utils.ReportError(err, c, "")
 		}
 		return
 	}
 
-	deleteInstanceMemoryTask(task.ID, c)
+	deleteInstanceMemoryTask(id, c)
 	c.String(200, "")
 }
 
@@ -261,7 +283,7 @@ func deleteInstanceMemoryTask(id string, c *gin.Context) {
 		return
 	}
 
-	_, err = db.Exec("delete from memory_tasks where id=$1", id)
+	_, err = db.Exec("DELETE FROM memory_tasks WHERE id=$1", id)
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
@@ -270,23 +292,14 @@ func deleteInstanceMemoryTask(id string, c *gin.Context) {
 
 // GetMemoryTask - Get the config of a specific memory task from the database
 func GetMemoryTask(c *gin.Context) {
-	app := c.Param("app")
 	id := c.Param("id")
 
-	db, err := utils.GetDBFromContext(c)
-	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
-	}
-
-	task := MemoryDBTask{}
-
-	err = db.Get(&task, "select * from memory_tasks where id=$1 and app=$2", id, app)
+	task, err := getTaskByID(id, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(200, nil)
+			c.JSON(404, nil)
 		} else {
-			utils.ReportError(err, c, "Unable to access database")
+			utils.ReportError(err, c, "")
 		}
 		return
 	}
@@ -306,7 +319,7 @@ func GetMemoryTasksForApp(c *gin.Context) {
 
 	tasks := []MemoryDBTask{}
 
-	err = db.Select(&tasks, "select * from memory_tasks where app=$1", app)
+	err = db.Select(&tasks, "SELECT * FROM memory_tasks WHERE app=$1 ORDER BY id ASC", app)
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
@@ -330,7 +343,7 @@ func ListMemoryTasks(c *gin.Context) {
 
 	tasks := []MemoryDBTask{}
 
-	err = db.Select(&tasks, "select * from memory_tasks order by app asc")
+	err = db.Select(&tasks, "SELECT * FROM memory_tasks ORDER BY app ASC")
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return

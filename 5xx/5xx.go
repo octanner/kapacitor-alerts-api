@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	structs "kapacitor-alerts-api/structs"
 	"kapacitor-alerts-api/utils"
@@ -45,6 +46,25 @@ select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqd
         [[end]]    
  
 `
+
+// getTaskByName - Get a task from the database
+func getTaskByName(app string, c *gin.Context) (*_5xxDBTask, error) {
+	db, err := utils.GetDBFromContext(c)
+	if err != nil {
+		return nil, errors.New("Unable to access database")
+	}
+
+	task := _5xxDBTask{}
+
+	err = db.Get(&task, "SELECT * FROM _5xx_tasks WHERE app=$1", app)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
+		return nil, errors.New("Unable to access database")
+	}
+	return &task, nil
+}
 
 // Process5xxRequest - Create structs for creating and updating 5xx tasks
 func Process5xxRequest(c *gin.Context) {
@@ -120,6 +140,16 @@ func Process5xxRequest(c *gin.Context) {
 	if c.Request.Method == "POST" {
 		create5xxTask(task, c)
 	} else if c.Request.Method == "PATCH" {
+		// Check if task exists before trying to patch it
+		_, err := getTaskByName(task.App, c)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				c.JSON(404, nil)
+			} else {
+				utils.ReportError(err, c, "")
+			}
+			return
+		}
 		delete5xxTask(task.App, c)
 		create5xxTask(task, c)
 	}
@@ -168,7 +198,7 @@ func create5xxTask(task _5xxTaskSpec, c *gin.Context) {
 	}
 
 	_, err = db.Exec(
-		"insert into _5xx_tasks values ($1, $2, $3, $4, $5)",
+		"INSERT INTO _5xx_tasks VALUES ($1, $2, $3, $4, $5)",
 		task.App, task.Tolerance, task.Slack, task.Post, task.Email,
 	)
 
@@ -183,25 +213,19 @@ func create5xxTask(task _5xxTaskSpec, c *gin.Context) {
 // Delete5xxTask - Verify that a task exists in the database before talking to Kapacitor
 func Delete5xxTask(c *gin.Context) {
 	app := c.Param("app")
-	db, err := utils.GetDBFromContext(c)
-	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
-	}
 
-	task := _5xxDBTask{}
-
-	err = db.Get(&task, "select * from _5xx_tasks where app=$1", app)
+	// Check if task exists before trying to delete it
+	_, err := getTaskByName(app, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			utils.ReportInvalidRequest(c, "Task not found")
+			c.JSON(404, nil)
 		} else {
-			utils.ReportError(err, c, "Unable to access database")
+			utils.ReportError(err, c, "")
 		}
 		return
 	}
 
-	delete5xxTask(task.App, c)
+	delete5xxTask(app, c)
 	c.String(200, "")
 }
 
@@ -239,7 +263,7 @@ func delete5xxTask(app string, c *gin.Context) {
 		return
 	}
 
-	_, err = db.Exec("delete from _5xx_tasks where app=$1", app)
+	_, err = db.Exec("DELETE FROM _5xx_tasks WHERE app=$1", app)
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
@@ -250,20 +274,12 @@ func delete5xxTask(app string, c *gin.Context) {
 func Get5xxTask(c *gin.Context) {
 	app := c.Param("app")
 
-	db, err := utils.GetDBFromContext(c)
-	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
-	}
-
-	task := _5xxDBTask{}
-
-	err = db.Get(&task, "select * from _5xx_tasks where app=$1", app)
+	task, err := getTaskByName(app, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(200, nil)
+			c.JSON(404, nil)
 		} else {
-			utils.ReportError(err, c, "Unable to access database")
+			utils.ReportError(err, c, "")
 		}
 		return
 	}
@@ -281,7 +297,7 @@ func List5xxTasks(c *gin.Context) {
 
 	tasks := []_5xxDBTask{}
 
-	err = db.Select(&tasks, "select * from _5xx_tasks order by app asc")
+	err = db.Select(&tasks, "SELECT * FROM _5xx_tasks ORDER BY app ASC")
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
@@ -300,20 +316,12 @@ func Get5xxTaskState(c *gin.Context) {
 	var stateresp _5xxSimpleTaskState
 	app := c.Param("app")
 
-	db, err := utils.GetDBFromContext(c)
-	if err != nil {
-		utils.ReportError(err, c, "Unable to access database")
-		return
-	}
-
-	// Verify there is a 5xx task in the database before we talk to Kapacitor
-	task := _5xxDBTask{}
-	err = db.Get(&task, "select from _5xx_tasks where app=$1", app)
+	_, err := getTaskByName(app, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(200, nil)
+			c.JSON(404, nil)
 		} else {
-			utils.ReportError(err, c, "Unable to access database")
+			utils.ReportError(err, c, "")
 		}
 		return
 	}
