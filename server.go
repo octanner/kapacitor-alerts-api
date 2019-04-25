@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	_5xx "kapacitor-alerts-api/5xx"
 	crashed "kapacitor-alerts-api/crashed"
 	memory "kapacitor-alerts-api/memory"
 	released "kapacitor-alerts-api/released"
-	"kapacitor-alerts-api/utils"
+	utils "kapacitor-alerts-api/utils"
 	"log"
 
 	"os"
@@ -15,36 +16,55 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// InitDB - Run any available creation and migration scripts
-func InitDB(db *sqlx.DB) {
+// initDB - Run any available creation and migration scripts
+func initDB(db *sqlx.DB) {
 	buf, err := ioutil.ReadFile("./create.sql")
 	if err != nil {
 		log.Println("Error: Unable to run migration scripts, could not load create.sql.")
 		log.Fatalln(err)
 	}
-	_, err = db.Query(string(buf))
+	_, err = db.Exec(string(buf))
 	if err != nil {
 		log.Println("Error: Unable to run migration scripts, execution failed.")
 		log.Fatalln(err)
 	}
 }
 
-// DbMiddleware - Add a SQL database connection to the Gin context
-func DbMiddleware(db *sqlx.DB) gin.HandlerFunc {
+// dbMiddleware - Add a SQL database connection to the Gin context
+func dbMiddleware(db *sqlx.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("db", db)
 		c.Next()
 	}
 }
 
+// checkEnv - Verify required environment variables exist
+func checkEnv() {
+	_, dbURL := os.LookupEnv("DATABASE_URL")
+	_, kapURL := os.LookupEnv("KAPACITOR_URL")
+
+	if !dbURL {
+		panic("✖ Environment variable DATABASE_URL not found.")
+	} else if !kapURL {
+		panic("✖ Environment variable KAPACITOR_URL not found.")
+	}
+}
+
 func main() {
+	checkEnv()
+
+	pool := utils.GetDB(os.Getenv("DATABASE_URL"))
+
+	_, migrate := os.LookupEnv("RUN_MIGRATION")
+	if migrate {
+		fmt.Println("Detected $RUN_MIGRATION environment variable")
+		runMigration(pool)
+	} else {
+		initDB(pool)
+	}
+
 	router := gin.Default()
-
-	url := os.Getenv("DATABASE_URL")
-	pool := utils.GetDB(url)
-	InitDB(pool)
-
-	router.Use(DbMiddleware(pool))
+	router.Use(dbMiddleware(pool))
 
 	router.POST("/task/memory", memory.ProcessInstanceMemoryRequest)
 	router.PATCH("/task/memory", memory.ProcessInstanceMemoryRequest)
