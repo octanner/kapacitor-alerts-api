@@ -18,17 +18,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-/***********
-*			Endpoints tested:
+/********************************************************
+*    Endpoints tested:
 *
-*			Method	Endpoint								Function
-*			---------------------------------------------------
-*			POST 		/task/memory						TestCreateMemoryTask
-*			PATCH 	/task/memory						TestUpdateMemoryTask
-*			DELETE 	/task/memory/:app				TestDeleteMemoryTask
-*			GET 		/tasks/memory						TestCreateMemoryTask
-*			GET 		/task/memory/:app				TestCreateMemoryTask
-*			GET 		/task/memory/:app/id		TestCreateMemoryTask
+*    Method   Endpoint                 Function
+*    ---------------------------------------------------
+*    POST     /task/memory             TestCreateMemoryTask
+*    PATCH    /task/memory             TestUpdateMemoryTask
+*    DELETE 	/task/memory/:app        TestDeleteMemoryTask
+*    GET      /tasks/memory            TestCreateMemoryTask
+*    GET      /tasks/memory/:app       TestCreateMemoryTask
+*    GET      /tasks/memory/:app/id    TestCreateMemoryTask
  */
 
 // setupRouter - Setup Gin routes for current test type
