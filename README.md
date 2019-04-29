@@ -8,6 +8,7 @@
 * [Installation and Usage](#installation-and-usage)
   * [Environment Variables](#environment-variables)
   * [Usage](#usage)
+  * [Testing](#testing)
 
 * [Database Migration](#database-migration)
 
@@ -64,8 +65,7 @@ This API communicates with Influx's Kapacitor alerts/monitoring API to enable mo
 ```bash
 export DATABASE_URL="postgres://localhost:5432/kapacitor-alerts-api"
 export KAPACITOR_URL="http://localhost:9092"
-./build.sh
-./start.sh
+go run .
 ```
 
 To run in Docker:
@@ -79,6 +79,15 @@ docker run \
 	--rm \
 	--name kapacitor-alerts-api \
 	kapacitor-alerts-api
+```
+
+### Testing
+
+To run code coverage tests:
+```bash
+export DATABASE_URL="postgres://localhost:5432/kapacitor-alerts-api"
+export KAPACITOR_URL="http://localhost:9092"
+go test ./...
 ```
 
 ## Database Migration

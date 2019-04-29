@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"kapacitor-alerts-api/structs"
+	utils "kapacitor-alerts-api/utils"
 	"log"
 	"net/http"
 	"os"
@@ -136,7 +137,7 @@ func runMigration(db *sqlx.DB) {
 	}
 
 	// Recreate tables
-	initDB(db)
+	utils.InitDB(db)
 
 	fmt.Println("✓ Database successfully recreated.")
 	fmt.Println()

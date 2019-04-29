@@ -2,41 +2,16 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	_5xx "kapacitor-alerts-api/5xx"
 	crashed "kapacitor-alerts-api/crashed"
 	memory "kapacitor-alerts-api/memory"
 	released "kapacitor-alerts-api/released"
 	utils "kapacitor-alerts-api/utils"
-	"log"
 
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 )
-
-// initDB - Run any available creation and migration scripts
-func initDB(db *sqlx.DB) {
-	buf, err := ioutil.ReadFile("./create.sql")
-	if err != nil {
-		log.Println("Error: Unable to run migration scripts, could not load create.sql.")
-		log.Fatalln(err)
-	}
-	_, err = db.Exec(string(buf))
-	if err != nil {
-		log.Println("Error: Unable to run migration scripts, execution failed.")
-		log.Fatalln(err)
-	}
-}
-
-// dbMiddleware - Add a SQL database connection to the Gin context
-func dbMiddleware(db *sqlx.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Set("db", db)
-		c.Next()
-	}
-}
 
 // checkEnv - Verify required environment variables exist
 func checkEnv() {
@@ -60,11 +35,11 @@ func main() {
 		fmt.Println("Detected $RUN_MIGRATION environment variable")
 		runMigration(pool)
 	} else {
-		initDB(pool)
+		utils.InitDB(pool)
 	}
 
 	router := gin.Default()
-	router.Use(dbMiddleware(pool))
+	router.Use(utils.DBMiddleware(pool))
 
 	router.POST("/task/memory", memory.ProcessInstanceMemoryRequest)
 	router.PATCH("/task/memory", memory.ProcessInstanceMemoryRequest)

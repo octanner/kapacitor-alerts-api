@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -30,4 +32,26 @@ func GetDBFromContext(c *gin.Context) (*sqlx.DB, error) {
 		return nil, errors.New("DB not available in context")
 	}
 	return db.(*sqlx.DB), nil
+}
+
+// DBMiddleware - Add a SQL database connection to the Gin context
+func DBMiddleware(db *sqlx.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("db", db)
+		c.Next()
+	}
+}
+
+// InitDB - Run any available creation and migration scripts
+func InitDB(db *sqlx.DB) {
+	buf, err := ioutil.ReadFile("./create.sql")
+	if err != nil {
+		log.Println("Error: Unable to run migration scripts, could not load create.sql.")
+		log.Fatalln(err)
+	}
+	_, err = db.Exec(string(buf))
+	if err != nil {
+		log.Println("Error: Unable to run migration scripts, execution failed.")
+		log.Fatalln(err)
+	}
 }

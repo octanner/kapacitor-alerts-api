@@ -115,3 +115,17 @@ type MemoryDBTask struct {
 	Post     zero.String `json:"post"`
 	Email    zero.String `json:"email"`
 }
+
+// MemoryDBTaskTest - Used for sending a POST request (during testing)
+type MemoryDBTaskTest struct {
+	ID       string      `json:"id"`
+	App      string      `json:"app"`
+	Dynotype string      `json:"dynotype"`
+	Crit     string      `json:"crit"`
+	Warn     string      `json:"warn"`
+	Wind     string      `json:"window"`
+	Every    string      `json:"every"`
+	Slack    zero.String `json:"slack"`
+	Post     zero.String `json:"post"`
+	Email    zero.String `json:"email"`
+}
