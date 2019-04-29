@@ -25,7 +25,7 @@ import (
 *    ---------------------------------------------------
 *    POST     /task/memory             TestCreateMemoryTask
 *    PATCH    /task/memory             TestUpdateMemoryTask
-*    DELETE 	/task/memory/:app        TestDeleteMemoryTask
+*    DELETE   /task/memory/:app        TestDeleteMemoryTask
 *    GET      /tasks/memory            TestCreateMemoryTask
 *    GET      /tasks/memory/:app       TestCreateMemoryTask
 *    GET      /tasks/memory/:app/id    TestCreateMemoryTask

@@ -23,7 +23,7 @@ import (
 *    ---------------------------------------------------
 *    POST     /task/5xx             TestCreate5xxTask
 *    PATCH    /task/5xx             TestUpdate5xxTask
-*    DELETE 	/task/5xx/:app        TestDelete5xxTask
+*    DELETE   /task/5xx/:app        TestDelete5xxTask
 *    GET      /tasks/5xx            TestCreate5xxTask
 *    GET      /task/5xx/:app        TestCreate5xxTask
 *    GET      /task/5xx/:app/state  TestGet5xxTaskState

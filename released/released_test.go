@@ -23,7 +23,7 @@ import (
 *    ---------------------------------------------------
 *    POST     /task/release         TestCreateReleasedTask
 *    PATCH    /task/release         TestUpdateReleasedTask
-*    DELETE 	/task/release/:app    TestDeleteReleasedTask
+*    DELETE   /task/release/:app    TestDeleteReleasedTask
 *    GET      /tasks/release        TestCreateReleasedTask
 *    GET      /task/release/:app    TestCreateReleasedTask
  */
