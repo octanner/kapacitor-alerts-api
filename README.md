@@ -388,7 +388,7 @@ URL: {{KAPACITOR_ALERTS_API}}/task/memory
 ```js        
 {
 	"app": "{{APP_NAME}}",		// App to monitor
-	"dynotype": "web",		// Dyno to monitor
+	"dynotype": "web",		// Dyno to monitor (use 'all' to monitor all dynos)
 	"warn": "200",			// Warning threshold (in MB)
 	"crit": "500",			// Critical threshold (in MB)
 	"window": "12h",		// Window to use for results
@@ -422,7 +422,7 @@ URL: {{KAPACITOR_ALERTS_API}}/task/memory
 ```js        
 {
 	"app": "{{APP_NAME}}",		// App to monitor
-	"dynotype": "web",		// Dyno to monitor
+	"dynotype": "web",		// Dyno to monitor (use 'all' to monitor all dynos)
 	"warn": "500",			// Warning threshold (in MB)
 	"crit": "700",			// Critical threshold (in MB)
 	"window": "12h",		// Window to use for results
