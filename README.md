@@ -361,7 +361,7 @@ Get the configuration of the memory usage monitoring on an app and dyno
 
 ```bash
 Method: GET
-URL: {{KAPACITOR_ALERTS_API}}/tasks/memory/{{APP_NAME}}/{{TASK_ID}}
+URL: {{KAPACITOR_ALERTS_API}}/tasks/memory/{{APP_NAME}}/{{DYNO}}
 ```
 
 #### 4. Create Task
@@ -441,7 +441,7 @@ Stop monitoring an app for memory usage
 
 ```bash
 Method: DELETE
-URL: {{KAPACITOR_ALERTS_API}}/task/memory/{{APP_NAME}}/{{TASK_ID}}
+URL: {{KAPACITOR_ALERTS_API}}/task/memory/{{APP_NAME}}/{{DYNO}}
 ```
 
 ***Headers:***

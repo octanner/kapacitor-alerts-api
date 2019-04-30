@@ -68,6 +68,24 @@ func getTaskByID(id string, c *gin.Context) (*MemoryDBTask, error) {
 	return &task, nil
 }
 
+func getTaskByNameAndDyno(app string, dyno string, c *gin.Context) (*MemoryDBTask, error) {
+	db, err := utils.GetDBFromContext(c)
+	if err != nil {
+		return nil, errors.New("Unable to access database")
+	}
+
+	task := MemoryDBTask{}
+
+	err = db.Get(&task, "SELECT * FROM memory_tasks WHERE app=$1 AND dynotype=$2", app, dyno)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
+		return nil, errors.New("Unable to access database")
+	}
+	return &task, nil
+}
+
 // ProcessInstanceMemoryRequest - POST | PATCH /task/memory
 func ProcessInstanceMemoryRequest(c *gin.Context) {
 	var vars map[string]structs.Var
@@ -243,12 +261,13 @@ func createInstanceMemoryTask(task MemoryTaskSpec, c *gin.Context) error {
 	return nil
 }
 
-// DeleteMemoryTask - DELETE /task/memory/:app/:id
+// DeleteMemoryTask - DELETE /task/memory/:app/:dyno
 func DeleteMemoryTask(c *gin.Context) {
-	id := c.Param("id")
+	app := c.Param("app")
+	dyno := c.Param("dyno")
 
 	// Check if task exists before trying to delete it
-	_, err := getTaskByID(id, c)
+	task, err := getTaskByNameAndDyno(app, dyno, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(404, nil)
@@ -258,7 +277,7 @@ func DeleteMemoryTask(c *gin.Context) {
 		return
 	}
 
-	err = deleteInstanceMemoryTask(id, c)
+	err = deleteInstanceMemoryTask(task.ID, c)
 	if err != nil {
 		utils.ReportError(err, c, "")
 		return
@@ -308,11 +327,12 @@ func deleteInstanceMemoryTask(id string, c *gin.Context) error {
 	return nil
 }
 
-// GetMemoryTask - GET /task/memory/:app/:id
+// GetMemoryTask - GET /task/memory/:app/:dyno
 func GetMemoryTask(c *gin.Context) {
-	id := c.Param("id")
+	app := c.Param("app")
+	dyno := c.Param("dyno")
 
-	task, err := getTaskByID(id, c)
+	task, err := getTaskByNameAndDyno(app, dyno, c)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(404, nil)

@@ -6,8 +6,8 @@ begin
     id TEXT NOT NULL UNIQUE,                            -- ID of task (from kapacitor)
     app TEXT NOT NULL,                                  -- Name of app to monitor
     dynotype TEXT NOT NULL,                             -- Dyno to monitor on app
-    crit INTEGER NOT NULL,                              -- Threshold for critical alert, in MB
-    warn INTEGER NOT NULL,                              -- Threshold for warning alert, in MB
+    crit TEXT NOT NULL,                                 -- Threshold for critical alert, in MB
+    warn TEXT NOT NULL,                                 -- Threshold for warning alert, in MB
     wind TEXT NOT NULL,                                 -- How far back to retrieve data (e.g. 10m, 30m, 1h)
     every TEXT NOT NULL,                                -- Frequency to check (e.g. 30s, 1m, 10m)
     slack TEXT,                                         -- Slack channel to notify

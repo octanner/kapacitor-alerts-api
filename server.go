@@ -43,9 +43,9 @@ func main() {
 
 	router.POST("/task/memory", memory.ProcessInstanceMemoryRequest)
 	router.PATCH("/task/memory", memory.ProcessInstanceMemoryRequest)
-	router.DELETE("/task/memory/:app/:id", memory.DeleteMemoryTask)
+	router.DELETE("/task/memory/:app/:dyno", memory.DeleteMemoryTask)
 	router.GET("/tasks/memory/:app", memory.GetMemoryTasksForApp)
-	router.GET("/tasks/memory/:app/:id", memory.GetMemoryTask)
+	router.GET("/tasks/memory/:app/:dyno", memory.GetMemoryTask)
 	router.GET("/tasks/memory", memory.ListMemoryTasks)
 
 	router.POST("/task/5xx", _5xx.Process5xxRequest)

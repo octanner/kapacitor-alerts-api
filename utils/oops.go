@@ -3,13 +3,13 @@ package utils
 import (
 	structs "kapacitor-alerts-api/structs"
 	"log"
+	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ReportError - Send an error message to the client
 func ReportError(err error, c *gin.Context, msg string) {
-	log.Println(err)
 	var er structs.ErrorResponse
 	if msg != "" {
 		er.Error = msg
@@ -19,6 +19,8 @@ func ReportError(err error, c *gin.Context, msg string) {
 		er.Error = "Internal server error"
 	}
 	c.JSON(500, er)
+	log.Println(err)
+	debug.PrintStack()
 }
 
 // ReportInvalidRequest - Send a 400 bad request message to the client
