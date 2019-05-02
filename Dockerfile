@@ -12,4 +12,5 @@ RUN /build.sh
 
 ADD start.sh /start.sh
 RUN chmod +x /start.sh
+WORKDIR /go/src/kapacitor-alerts-api
 CMD "/start.sh"
