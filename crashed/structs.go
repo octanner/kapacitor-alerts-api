@@ -2,6 +2,8 @@ package crashed
 
 import (
 	structs "kapacitor-alerts-api/structs"
+
+	"gopkg.in/guregu/null.v3/zero"
 )
 
 type CrashedVars struct {
@@ -39,7 +41,7 @@ type CrashedVars struct {
 
 type CrashedTaskList struct {
 	Tasks []struct {
-		ID   string     `json:"id"`
+		ID   string      `json:"id"`
 		Vars CrashedVars `json:"vars"`
 	} `json:"tasks"`
 }
@@ -57,7 +59,15 @@ type CrashedTaskSpec struct {
 	EmailArray []string           `json:"emailarray"`
 	//    Opsgenie string         `json:"opsgenie"`
 	Vars     map[string]structs.Var `json:"vars"`
-        Shortapp   string               `json:"shortapp"`
-        Dynotype   string               `json:"dynotype"`
-        Space      string               `json:"space"`
+	Shortapp string                 `json:"shortapp"`
+	Dynotype string                 `json:"dynotype"`
+	Space    string                 `json:"space"`
+}
+
+// CrashedDBTask - Used for retrieval of task information from the database
+type CrashedDBTask struct {
+	App   string      `json:"app"`
+	Slack zero.String `json:"slack"`
+	Post  zero.String `json:"post"`
+	Email zero.String `json:"email"`
 }

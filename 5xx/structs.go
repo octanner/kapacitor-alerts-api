@@ -2,6 +2,8 @@ package _5xx
 
 import (
 	structs "kapacitor-alerts-api/structs"
+
+	"gopkg.in/guregu/null.v3/zero"
 )
 
 type _5xxVars struct {
@@ -103,4 +105,12 @@ type _5xxTaskState struct {
 type _5xxSimpleTaskState struct {
 	App   string `json:"app"`
 	State string `json:"state"`
+}
+
+type _5xxDBTask struct {
+	App       string      `json:"app"`
+	Tolerance string      `json:"tolerance"`
+	Slack     zero.String `json:"slack"`
+	Post      zero.String `json:"post"`
+	Email     zero.String `json:"email"`
 }

@@ -1,4 +1,4 @@
-package crashed
+package released
 
 import (
 	"bufio"
@@ -17,44 +17,44 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const crashalerttemplate = `
+const releasealerttemplate = `
 	batch
-		|	query('''
-				select text,title,app,tags from "opentsdb"."autogen"."events" where "app"='[[ .App ]]' and "title"= 'crashed' and text ='App crashed' and tags =~ /[[ .Space ]],[[ .Shortapp ]],/
-			''')
-				.period(60s)
-				.every(61s)
-		|	alert()
-				.warn(lambda: 1 > 0)
-				[[if .Slack ]]
-					.slack()
-					.channel('[[ .Slack ]]')
-				[[end]]
-				.message('{{ index .Fields "app" }} crashed. Info: {{ index .Fields "tags" }}')
-				.details('''
+    |	query('''
+				select text,title,app from "opentsdb"."autogen"."events" where "app"='[[ .App ]]' and "title"= 'released'
+    	''')
+      	.period(60s)
+      	.every(61s)
+    | alert()
+        .warn(lambda: 1 > 0)
+        [[if .Slack ]]
+        	.slack()
+        	.channel('[[ .Slack ]]')
+        [[end]]
+        .message('{{ index .Fields "app" }} released.  New image is {{ index .Fields "text" }}')
+        .details('''
 					<h3>{{ .Message }}</h3>
-					{{ index .Fields "app" }} crashed. Info: {{ index .Fields "tags" }} 
+					{{ index .Fields "app" }} released.  New image is {{ index .Fields "text" }}
 				''')
 				[[if .Email]]
 					[[ range $email := .EmailArray ]] 
 						.email('[[ $email ]]')
 					[[end]]
 				[[end]]
-				[[if .Post]]
-					.post('[[ .Post ]]')
-				[[end]]
+        [[if .Post]]
+        	.post('[[ .Post ]]')
+        [[end]]
 `
 
 // getTaskByName - Get a task from the database
-func getTaskByName(app string, c *gin.Context) (*CrashedDBTask, error) {
+func getTaskByName(app string, c *gin.Context) (*ReleasedDBTask, error) {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
 		return nil, errors.New("Unable to access database")
 	}
 
-	task := CrashedDBTask{}
+	task := ReleasedDBTask{}
 
-	err = db.Get(&task, "SELECT * FROM crashed_tasks WHERE app=$1", app)
+	err = db.Get(&task, "SELECT * FROM released_tasks WHERE app=$1", app)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, sql.ErrNoRows
@@ -64,8 +64,8 @@ func getTaskByName(app string, c *gin.Context) (*CrashedDBTask, error) {
 	return &task, nil
 }
 
-// ProcessCrashedRequest - POST | PATCH /task/crashed
-func ProcessCrashedRequest(c *gin.Context) {
+// ProcessReleaseRequest - POST | PATCH /task/release
+func ProcessReleaseRequest(c *gin.Context) {
 	var vars map[string]structs.Var
 	vars = make(map[string]structs.Var)
 
@@ -77,14 +77,14 @@ func ProcessCrashedRequest(c *gin.Context) {
 
 	var dbrps []structs.DbrpSpec
 	var dbrp structs.DbrpSpec
-	var task CrashedTaskSpec
+	var task ReleaseTaskSpec
 	err = json.Unmarshal(bodybytes, &task)
 	if err != nil {
 		utils.ReportError(err, c, "Server Error while reading response")
 		return
 	}
 
-	task.ID = task.App + "-crash"
+	task.ID = task.App + "-release"
 	task.Type = "batch"
 	vars = utils.AddVar("type", task.Type, "string", vars)
 
@@ -94,14 +94,14 @@ func ProcessCrashedRequest(c *gin.Context) {
 	task.Dbrps = dbrps
 	task.Script = ""
 	task.Status = "enabled"
-	task.Shortapp, task.Dynotype, task.Space = parseforparts(task.App)
+
 	if !strings.HasPrefix(task.Slack, "#") && !strings.HasPrefix(task.Slack, "@") {
 		task.Slack = "#" + task.Slack
 	}
 
 	task.EmailArray = strings.Split(task.Email, ",")
 
-	t := template.Must(template.New("crashalerttemplate").Delims("[[", "]]").Parse(crashalerttemplate))
+	t := template.Must(template.New("releasealerttemplate").Delims("[[", "]]").Parse(releasealerttemplate))
 	var sb bytes.Buffer
 	swr := bufio.NewWriter(&sb)
 	err = t.Execute(swr, task)
@@ -126,7 +126,7 @@ func ProcessCrashedRequest(c *gin.Context) {
 	}
 
 	if c.Request.Method == "POST" {
-		err = createCrashedTask(task, c)
+		err = createReleaseTask(task, c)
 		if err != nil {
 			utils.ReportError(err, c, "")
 			return
@@ -145,13 +145,13 @@ func ProcessCrashedRequest(c *gin.Context) {
 			return
 		}
 
-		err = deleteCrashedTask(task.App, c)
+		err = deleteReleaseTask(task.App, c)
 		if err != nil {
 			utils.ReportError(err, c, "")
 			return
 		}
 
-		err = createCrashedTask(task, c)
+		err = createReleaseTask(task, c)
 		if err != nil {
 			utils.ReportError(err, c, "")
 			return
@@ -161,15 +161,15 @@ func ProcessCrashedRequest(c *gin.Context) {
 	c.String(201, "")
 }
 
-func deleteCrashedTask(app string, c *gin.Context) error {
+// deleteReleaseTask - Delete a task from Kapacitor and remove its config from the database
+func deleteReleaseTask(app string, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
 		return errors.New("Unable to access database")
 	}
 
 	client := http.Client{}
-
-	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+app+"-crash", nil)
+	req, err := http.NewRequest("DELETE", os.Getenv("KAPACITOR_URL")+"/kapacitor/v1/tasks/"+app+"-release", nil)
 	if err != nil {
 		return errors.New("Server Error while reading response")
 	}
@@ -194,7 +194,7 @@ func deleteCrashedTask(app string, c *gin.Context) error {
 		return errors.New(er.Error)
 	}
 
-	_, err = db.Exec("DELETE FROM crashed_tasks WHERE app=$1", app)
+	_, err = db.Exec("DELETE FROM released_tasks WHERE app=$1", app)
 	if err != nil {
 		return errors.New("Unable to access database")
 	}
@@ -202,8 +202,8 @@ func deleteCrashedTask(app string, c *gin.Context) error {
 	return nil
 }
 
-// createCrashedTask - Create a task in Kapacitor and save the config to the database
-func createCrashedTask(task CrashedTaskSpec, c *gin.Context) error {
+// createReleaseTask - Create a task in Kapacitor and save its config to the database
+func createReleaseTask(task ReleaseTaskSpec, c *gin.Context) error {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
 		return errors.New("Unable to access database")
@@ -242,7 +242,7 @@ func createCrashedTask(task CrashedTaskSpec, c *gin.Context) error {
 	}
 
 	_, err = db.Exec(
-		"INSERT INTO crashed_tasks VALUES ($1, $2, $3, $4)",
+		"INSERT INTO released_tasks VALUES ($1, $2, $3, $4)",
 		task.App, task.Slack, task.Post, task.Email,
 	)
 
@@ -253,8 +253,8 @@ func createCrashedTask(task CrashedTaskSpec, c *gin.Context) error {
 	return nil
 }
 
-// DeleteCrashedTask - DELETE /task/crashed/:app
-func DeleteCrashedTask(c *gin.Context) {
+// DeleteReleaseTask - DELETE /task/release/:app
+func DeleteReleaseTask(c *gin.Context) {
 	app := c.Param("app")
 
 	// Check if task exists before trying to delete it
@@ -269,7 +269,7 @@ func DeleteCrashedTask(c *gin.Context) {
 	}
 
 	// Delete the task from Kapacitor and remove the config from the database
-	err = deleteCrashedTask(app, c)
+	err = deleteReleaseTask(app, c)
 	if err != nil {
 		utils.ReportError(err, c, "")
 	} else {
@@ -277,8 +277,8 @@ func DeleteCrashedTask(c *gin.Context) {
 	}
 }
 
-// GetCrashedTask - GET /task/crashed/:app
-func GetCrashedTask(c *gin.Context) {
+// GetReleaseTask - GET /task/release/:app
+func GetReleaseTask(c *gin.Context) {
 	app := c.Param("app")
 
 	task, err := getTaskByName(app, c)
@@ -294,17 +294,17 @@ func GetCrashedTask(c *gin.Context) {
 	c.JSON(200, task)
 }
 
-// ListCrashedTasks - GET /tasks/crashed
-func ListCrashedTasks(c *gin.Context) {
+// ListReleaseTasks - GET /tasks/release
+func ListReleaseTasks(c *gin.Context) {
 	db, err := utils.GetDBFromContext(c)
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
 	}
 
-	tasks := []CrashedDBTask{}
+	tasks := []ReleasedDBTask{}
 
-	err = db.Select(&tasks, "SELECT * FROM crashed_tasks ORDER BY app ASC")
+	err = db.Select(&tasks, "SELECT * FROM released_tasks ORDER BY app ASC")
 	if err != nil {
 		utils.ReportError(err, c, "Unable to access database")
 		return
@@ -316,17 +316,4 @@ func ListCrashedTasks(c *gin.Context) {
 	}
 
 	c.JSON(200, tasks)
-}
-
-func parseforparts(full string) (a string, d string, s string) {
-	if strings.Contains(full, "--") {
-		a = strings.Split(full, "--")[0]
-		d = strings.Split(strings.Split(full, "--")[1], "-")[0]
-		s = strings.Join(strings.Split(strings.Split(full, "--")[1], "-")[1:], "-")
-	} else {
-		a = strings.Split(full, "-")[0]
-		d = "web"
-		s = strings.Join(strings.Split(full, "-")[1:], "-")
-	}
-	return a, d, s
 }
