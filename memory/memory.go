@@ -20,7 +20,7 @@ import (
 const memoryalerttemplate = `
 	batch
     |	query('''
-				select mean(value)/1024/1024 as value from "opentsdb"."autogen"."[[ .Metric ]]" where "app"='[[ .App ]]' and "dyno" [[ .Dynotype ]]
+				select mean(value)/1024/1024 as value from "opentsdb"."retention_policy"."[[ .Metric ]]" where "app"='[[ .App ]]' and "dyno" [[ .Dynotype ]]
     	''')
         .period([[ .Window ]])
         .every([[ .Every ]])
@@ -122,7 +122,7 @@ func ProcessInstanceMemoryRequest(c *gin.Context) {
 	vars = utils.AddVar("type", task.Type, "string", vars)
 
 	dbrp.Db = "opentsdb"
-	dbrp.Rp = "autogen"
+	dbrp.Rp = "retention_policy"
 	dbrps = append(dbrps, dbrp)
 
 	if task.Dynotype == "all" {

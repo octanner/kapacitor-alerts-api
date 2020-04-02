@@ -19,7 +19,7 @@ import (
 
 const _5xxalerttemplate = `batch
     |	query('''
-				select count("value") from "opentsdb"."autogen"./router.status.(5.*)/ where "fqdn"='[[ .Fqdn ]]'
+				select count("value") from "opentsdb"."retention_policy"./router.status.(5.*)/ where "fqdn"='[[ .Fqdn ]]'
     	''')
         .period(10m)
         .every(1m)
@@ -99,7 +99,7 @@ func Process5xxRequest(c *gin.Context) {
 	tolerancelist["high"] = "1.5"
 	task.Sigma = tolerancelist[task.Tolerance]
 	dbrp.Db = "opentsdb"
-	dbrp.Rp = "autogen"
+	dbrp.Rp = "retention_policy"
 	dbrps = append(dbrps, dbrp)
 	task.Dbrps = dbrps
 	task.Script = ""
