@@ -19,7 +19,7 @@ import (
 
 const _5xxalerttemplate = `batch
     |	query('''
-				select count("value") from "opentsdb"."retention_policy"./router.status.(5.*)/ where "fqdn"='[[ .Fqdn ]]'
+				select count("value") from "opentsdb"."retention_policy"./router.status.(5.*)/ where "fqdn" =~ /[[ .App ]]/
     	''')
         .period(10m)
         .every(1m)
