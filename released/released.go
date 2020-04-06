@@ -20,7 +20,7 @@ import (
 const releasealerttemplate = `
 	batch
     |	query('''
-				select text,title,app from "opentsdb"."autogen"."events" where "app"='[[ .App ]]' and "title"= 'released'
+				select text,title,app from "opentsdb"."retention_policy"."events" where "app"='[[ .App ]]' and "title"= 'released'
     	''')
       	.period(60s)
       	.every(61s)
@@ -89,7 +89,7 @@ func ProcessReleaseRequest(c *gin.Context) {
 	vars = utils.AddVar("type", task.Type, "string", vars)
 
 	dbrp.Db = "opentsdb"
-	dbrp.Rp = "autogen"
+	dbrp.Rp = "retention_policy"
 	dbrps = append(dbrps, dbrp)
 	task.Dbrps = dbrps
 	task.Script = ""

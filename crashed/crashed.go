@@ -20,7 +20,7 @@ import (
 const crashalerttemplate = `
 	batch
 		|	query('''
-				select text,title,app,tags from "opentsdb"."autogen"."events" where "app"='[[ .App ]]' and "title"= 'crashed' and text ='App crashed' and tags =~ /[[ .Space ]],[[ .Shortapp ]],/
+				select text,title,app,tags from "opentsdb"."retention_policy"."events" where "app"='[[ .App ]]' and "title"= 'crashed' and text ='App crashed' and tags =~ /[[ .Space ]],[[ .Shortapp ]],/
 			''')
 				.period(60s)
 				.every(61s)
@@ -89,7 +89,7 @@ func ProcessCrashedRequest(c *gin.Context) {
 	vars = utils.AddVar("type", task.Type, "string", vars)
 
 	dbrp.Db = "opentsdb"
-	dbrp.Rp = "autogen"
+	dbrp.Rp = "retention_policy"
 	dbrps = append(dbrps, dbrp)
 	task.Dbrps = dbrps
 	task.Script = ""
