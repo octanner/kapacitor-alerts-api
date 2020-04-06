@@ -34,10 +34,10 @@ const _5xxalerttemplate = `batch
       	  .slack()
       	  .channel('[[ .Slack ]]')
         [[end]]
-        .message('[[ .Fqdn ]]: {{ if eq .Level "CRITICAL" }}Excessive 5xxs {{ end }}{{ if eq .Level "OK" }}5xxs back to normal {{ end }}{{ if eq .Level "INFO" }}5xxs Returning to Normal {{ end }}{{ if eq .Level "WARNING" }}Elevated 5xxs {{ end }} Metric: {{ .Name }}  Sigma: {{ index .Fields "sigma" | printf "%0.2f" }} Count: {{ index .Fields "count" }}')
+        .message('[[ .App ]]: {{ if eq .Level "CRITICAL" }}Excessive 5xxs {{ end }}{{ if eq .Level "OK" }}5xxs back to normal {{ end }}{{ if eq .Level "INFO" }}5xxs Returning to Normal {{ end }}{{ if eq .Level "WARNING" }}Elevated 5xxs {{ end }} Metric: {{ .Name }}  Sigma: {{ index .Fields "sigma" | printf "%0.2f" }} Count: {{ index .Fields "count" }}')
         .details('''
 					<h3>{{ .Message }}</h3>
-					<a href="https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=[[ .Fqdn ]]&from=now-1h&to=now&panelId=4&fullscreen">Link To Memory Banks</a>
+					<a href="https://membanks.octanner.io/dashboard/db/alamo-router-scanner?var-url=[[ .App ]]&from=now-1h&to=now&panelId=4&fullscreen">Link To Memory Banks</a>
 				''')
 				[[if .Email]]
 					[[ range $email := .EmailArray ]]
