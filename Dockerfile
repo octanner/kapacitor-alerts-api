@@ -1,4 +1,4 @@
-FROM golang:1.12-alpine
+FROM golang:1.22rc2-alpine
 
 RUN apk update
 RUN apk add openssl ca-certificates git
